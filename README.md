@@ -1,6 +1,6 @@
 # IUDX MCP Server
 
-A [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server for the [India Urban Data Exchange (IUDX)](https://iudx.org.in) platform. It exposes the full IUDX Control Plane API as **55 Tools**, **8 Resources**, and **8 Prompts**, enabling AI assistants (Claude Desktop, Claude Code, and any MCP-compatible client) to discover, access, and manage IUDX datasets, AI models, organisations, and subscriptions through natural language.
+A [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server for the [Intelligent Universal Data Exchange (IUDX)](https://dataforpublicgood.org.in/technology/) platform. It exposes the full IUDX Control Plane API as **55 Tools**, **8 Resources**, and **8 Prompts**, enabling AI assistants (Claude Desktop, Claude Code, and any MCP-compatible client) to discover, access, and manage IUDX datasets, AI models, organisations, and subscriptions through natural language.
 
 ---
 
