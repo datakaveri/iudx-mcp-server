@@ -1,6 +1,6 @@
 # IUDX MCP Server
 
-A [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server for the [Intelligent Universal Data Exchange (IUDX)](https://dataforpublicgood.org.in/technology/) platform. It exposes the full IUDX **Control Plane** and **Resource Server** APIs as **67 Tools**, **8 Resources**, and **11 Prompts**, enabling AI assistants (Claude Desktop, Claude Code, and any MCP-compatible client) to discover, access, query, and ingest IUDX datasets, AI models, organisations, and subscriptions through natural language.
+A [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server for the [Intelligent Universal Data Exchange (IUDX)](https://dataforpublicgood.org.in/technology/) platform. It exposes the full IUDX **Control Plane** and **Resource Server** APIs as **67 Tools**, **7 Resources** (+ 1 resource template), and **11 Prompts**, enabling AI assistants (Claude Desktop, Claude Code, and any MCP-compatible client) to discover, access, query, and ingest IUDX datasets, AI models, organisations, and subscriptions through natural language.
 
 ---
 
@@ -39,6 +39,11 @@ A [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server for the
 - [Resources Reference](#resources-reference)
 - [Prompts Reference](#prompts-reference)
 - [Usage Examples](#usage-examples)
+- [Example Client](#example-client)
+  - [Run modes](#run-modes)
+  - [Stdio transport](#stdio-transport)
+  - [SSE transport](#sse-transport)
+  - [RS tools](#rs-tools)
 - [Project Structure](#project-structure)
 
 ---
@@ -72,7 +77,7 @@ source $HOME/.local/bin/env
 ## Installation
 
 ```bash
-git clone https://github.com/your-org/iudx-mcp-server.git
+git clone https://github.com/swaminathanvasanth/iudx-mcp-server.git
 cd iudx-mcp-server
 
 # Create a virtual environment and install dependencies
@@ -189,11 +194,11 @@ docker run -p 8000:8000 iudx-mcp-server
 # Run against a different IUDX environment
 docker run -p 8000:8000 \
   -e IUDX_BASE_URL=https://v2.prod.controlplane.iudx.io \
+  -e RS_BASE_URL=https://v2.prod.rs.iudx.io \
   iudx-mcp-server
 
 # Run in stdio mode (for use as a Docker-based MCP client command)
-docker run -i --rm iudx-mcp-server \
-  python server.py
+docker run -i --rm -e MCP_TRANSPORT=stdio iudx-mcp-server
 ```
 
 ---
@@ -221,7 +226,9 @@ docker compose logs -f
 docker compose down
 
 # Point to production IUDX
-IUDX_BASE_URL=https://v2.prod.controlplane.iudx.io docker compose up -d
+IUDX_BASE_URL=https://v2.prod.controlplane.iudx.io \
+  RS_BASE_URL=https://v2.prod.rs.iudx.io \
+  docker compose up -d
 ```
 
 ---
@@ -275,10 +282,7 @@ docker compose --env-file .env up -d
   "mcpServers": {
     "iudx": {
       "command": "docker",
-      "args": ["run", "-i", "--rm",
-               "-e", "MCP_TRANSPORT=stdio",
-               "iudx-mcp-server",
-               "python", "server.py"]
+      "args": ["run", "-i", "--rm", "-e", "MCP_TRANSPORT=stdio", "iudx-mcp-server"]
     }
   }
 }
@@ -311,7 +315,7 @@ Or in `.claude/settings.json`:
 ```bash
 claude mcp add iudx \
   --command "docker" \
-  --args "run,-i,--rm,-e,MCP_TRANSPORT=stdio,iudx-mcp-server,python,server.py"
+  --args "run,-i,--rm,-e,MCP_TRANSPORT=stdio,iudx-mcp-server"
 ```
 
 ---
@@ -597,16 +601,23 @@ All ingestion tools require a Bearer JWT with data-ingestion privileges. Data mu
 
 Resources are **read-only, URI-addressable** data sources backed by public IUDX endpoints. They provide ambient context to an LLM without requiring tool calls.
 
+**Concrete resources** (returned by `list_resources()`):
+
 | URI | Description | Backing Endpoint |
 |---|---|---|
 | `iudx://catalogue/datasets` | First 100 publicly discoverable DataBank items | `POST /iudx/v2/cat/search` |
-| `iudx://catalogue/datasets/{id}` | Full metadata for a specific item by UUID | `GET /iudx/v2/cat/item` |
 | `iudx://catalogue/ai_models` | First 100 publicly discoverable AI Model items | `POST /iudx/v2/cat/search` |
 | `iudx://catalogue/apps` | First 100 publicly discoverable App items | `POST /iudx/v2/cat/search` |
 | `iudx://dashboard/usage_summary` | Platform-wide usage metrics | `GET /iudx/v2/dashboard/usage-summary` |
 | `iudx://leaderboard/assets` | Top assets ranked by usage | `GET /iudx/v2/leaderboard/asset` |
 | `iudx://leaderboard/providers` | Top data providers | `GET /iudx/v2/leaderboard/provider` |
 | `iudx://leaderboard/organizations` | Top organisations | `GET /iudx/v2/leaderboard/organization` |
+
+**Resource template** (read by supplying a UUID):
+
+| URI Template | Description | Backing Endpoint |
+|---|---|---|
+| `iudx://catalogue/datasets/{id}` | Full metadata for a specific item by UUID | `GET /iudx/v2/cat/item` |
 
 ---
 
@@ -745,7 +756,7 @@ search_catalogue(
 
 ```
 count_catalogue_entities()
-# → {"result": [{"adex:DataBank": 74, "adex:AiModel": 110, "adex:Apps": 76}]}
+# → {"result": [{"adex:DataBank": ..., "adex:AiModel": ..., "adex:Apps": ...}]}
 ```
 
 ### Fetch metadata for a specific item
@@ -865,6 +876,114 @@ rs_ingest_entities_publish(
 
 ---
 
+## Example Client
+
+`examples/example_client.py` is a self-contained Python script that shows how to connect to the IUDX MCP server programmatically using the official `mcp` Python SDK.
+
+### Run modes
+
+| Mode | Command | When to use |
+|---|---|---|
+| `stdio` | `python examples/example_client.py stdio` | Local dev — server started automatically as a subprocess |
+| `sse` | `python examples/example_client.py sse [url]` | Server already running via Docker / `MCP_TRANSPORT=sse` |
+| `http` | `python examples/example_client.py http [url]` | Streamable-HTTP transport (MCP ≥ 1.3) |
+
+### Stdio transport
+
+The simplest way to get started — no server process needed:
+
+```bash
+# Install dependencies
+python3 -m venv .venv && source .venv/bin/activate
+pip install "mcp[cli]" httpx
+
+# Run the example
+python examples/example_client.py stdio
+```
+
+Expected output:
+
+```
+Transport: stdio  (spawning server.py)
+
+──────────────────────────────────────────────────────────
+  Available tools (67 total)
+──────────────────────────────────────────────────────────
+["search_catalogue", "get_cat_item", ..., "rs_ingest_entities_publish"]
+
+──────────────────────────────────────────────────────────
+  count_catalogue_entities
+──────────────────────────────────────────────────────────
+{"type": "dx:controlPlane:success", "result": [{"adex:DataBank": 50, ...}]}
+
+✓  Demo complete
+```
+
+### SSE transport
+
+Start the server first, then connect:
+
+```bash
+# Terminal 1 — start server
+MCP_TRANSPORT=sse python server.py
+
+# Terminal 2 — run client
+python examples/example_client.py sse http://localhost:8000/sse
+```
+
+Or against a Docker deployment:
+
+```bash
+docker compose up -d
+python examples/example_client.py sse http://localhost:8000/sse
+```
+
+### RS tools
+
+The RS tool examples in the client are commented out because they require a Bearer JWT. To enable them:
+
+1. Obtain a token:
+
+```python
+result = await session.call_tool("get_token", {
+    "credentials_json": '{"username": "you@example.com", "password": "secret"}'
+})
+token = json.loads(result.content[0].text)["result"]["access_token"]
+```
+
+2. Uncomment and fill in the RS section in `example_client.py`:
+
+```python
+TOKEN = "<token from step 1>"
+RESOURCE_ID = "<uuid from catalogue>"
+
+result = await session.call_tool("rs_get_latest_entity_data", {
+    "resource_id": RESOURCE_ID,
+    "token": TOKEN,
+    "size": 5,
+    "sort": "observationDateTime:desc",
+})
+
+result = await session.call_tool("rs_get_temporal_entities", {
+    "resource_id": RESOURCE_ID,
+    "timerel": "between",
+    "time_at": "2024-01-01T00:00:00Z",
+    "end_time_at": "2024-01-07T23:59:59Z",
+    "token": TOKEN,
+    "limit": 10,
+    "format": "simplified",
+})
+
+result = await session.call_tool("rs_download_entity_data", {
+    "resource_id": RESOURCE_ID,
+    "token": TOKEN,
+    "sort": "observationDateTime:asc",
+})
+# → returns raw CSV text
+```
+
+---
+
 ## Project Structure
 
 ```
@@ -874,7 +993,9 @@ iudx-mcp-server/
 ├── Dockerfile           # Container image (SSE transport by default)
 ├── docker-compose.yml   # Single-service Compose stack
 ├── .dockerignore        # Files excluded from the Docker build context
-└── README.md            # This file
+├── README.md            # This file
+└── examples/
+    └── example_client.py  # Programmatic MCP client (stdio / SSE / HTTP)
 ```
 
 ### Key design decisions
