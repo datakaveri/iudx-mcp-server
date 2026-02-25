@@ -1,6 +1,6 @@
 # IUDX MCP Server
 
-A [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server for the [Intelligent Universal Data Exchange (IUDX)](https://dataforpublicgood.org.in/technology/) platform. It exposes the full IUDX **Control Plane** and **Resource Server** APIs as **67 Tools**, **8 Resources**, and **11 Prompts**, enabling AI assistants (Claude Desktop, Claude Code, and any MCP-compatible client) to discover, access, query, and ingest IUDX datasets, AI models, organisations, and subscriptions through natural language.
+A [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server for the [Intelligent Universal Data Exchange (IUDX)](https://dataforpublicgood.org.in/technology/) platform. It exposes the full IUDX **Control Plane** and **Resource Server** APIs as **67 Tools**, **7 Resources** (+ 1 resource template), and **11 Prompts**, enabling AI assistants (Claude Desktop, Claude Code, and any MCP-compatible client) to discover, access, query, and ingest IUDX datasets, AI models, organisations, and subscriptions through natural language.
 
 ---
 
@@ -77,7 +77,7 @@ source $HOME/.local/bin/env
 ## Installation
 
 ```bash
-git clone https://github.com/your-org/iudx-mcp-server.git
+git clone https://github.com/swaminathanvasanth/iudx-mcp-server.git
 cd iudx-mcp-server
 
 # Create a virtual environment and install dependencies
@@ -194,11 +194,11 @@ docker run -p 8000:8000 iudx-mcp-server
 # Run against a different IUDX environment
 docker run -p 8000:8000 \
   -e IUDX_BASE_URL=https://v2.prod.controlplane.iudx.io \
+  -e RS_BASE_URL=https://v2.prod.rs.iudx.io \
   iudx-mcp-server
 
 # Run in stdio mode (for use as a Docker-based MCP client command)
-docker run -i --rm iudx-mcp-server \
-  python server.py
+docker run -i --rm -e MCP_TRANSPORT=stdio iudx-mcp-server
 ```
 
 ---
@@ -226,7 +226,9 @@ docker compose logs -f
 docker compose down
 
 # Point to production IUDX
-IUDX_BASE_URL=https://v2.prod.controlplane.iudx.io docker compose up -d
+IUDX_BASE_URL=https://v2.prod.controlplane.iudx.io \
+  RS_BASE_URL=https://v2.prod.rs.iudx.io \
+  docker compose up -d
 ```
 
 ---
@@ -280,10 +282,7 @@ docker compose --env-file .env up -d
   "mcpServers": {
     "iudx": {
       "command": "docker",
-      "args": ["run", "-i", "--rm",
-               "-e", "MCP_TRANSPORT=stdio",
-               "iudx-mcp-server",
-               "python", "server.py"]
+      "args": ["run", "-i", "--rm", "-e", "MCP_TRANSPORT=stdio", "iudx-mcp-server"]
     }
   }
 }
@@ -316,7 +315,7 @@ Or in `.claude/settings.json`:
 ```bash
 claude mcp add iudx \
   --command "docker" \
-  --args "run,-i,--rm,-e,MCP_TRANSPORT=stdio,iudx-mcp-server,python,server.py"
+  --args "run,-i,--rm,-e,MCP_TRANSPORT=stdio,iudx-mcp-server"
 ```
 
 ---
@@ -602,16 +601,23 @@ All ingestion tools require a Bearer JWT with data-ingestion privileges. Data mu
 
 Resources are **read-only, URI-addressable** data sources backed by public IUDX endpoints. They provide ambient context to an LLM without requiring tool calls.
 
+**Concrete resources** (returned by `list_resources()`):
+
 | URI | Description | Backing Endpoint |
 |---|---|---|
 | `iudx://catalogue/datasets` | First 100 publicly discoverable DataBank items | `POST /iudx/v2/cat/search` |
-| `iudx://catalogue/datasets/{id}` | Full metadata for a specific item by UUID | `GET /iudx/v2/cat/item` |
 | `iudx://catalogue/ai_models` | First 100 publicly discoverable AI Model items | `POST /iudx/v2/cat/search` |
 | `iudx://catalogue/apps` | First 100 publicly discoverable App items | `POST /iudx/v2/cat/search` |
 | `iudx://dashboard/usage_summary` | Platform-wide usage metrics | `GET /iudx/v2/dashboard/usage-summary` |
 | `iudx://leaderboard/assets` | Top assets ranked by usage | `GET /iudx/v2/leaderboard/asset` |
 | `iudx://leaderboard/providers` | Top data providers | `GET /iudx/v2/leaderboard/provider` |
 | `iudx://leaderboard/organizations` | Top organisations | `GET /iudx/v2/leaderboard/organization` |
+
+**Resource template** (read by supplying a UUID):
+
+| URI Template | Description | Backing Endpoint |
+|---|---|---|
+| `iudx://catalogue/datasets/{id}` | Full metadata for a specific item by UUID | `GET /iudx/v2/cat/item` |
 
 ---
 
@@ -750,7 +756,7 @@ search_catalogue(
 
 ```
 count_catalogue_entities()
-# → {"result": [{"adex:DataBank": 74, "adex:AiModel": 110, "adex:Apps": 76}]}
+# → {"result": [{"adex:DataBank": ..., "adex:AiModel": ..., "adex:Apps": ...}]}
 ```
 
 ### Fetch metadata for a specific item
