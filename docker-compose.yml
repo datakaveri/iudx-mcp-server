@@ -1,0 +1,26 @@
+services:
+  iudx-mcp-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: iudx-mcp-server:latest
+    container_name: iudx-mcp-server
+    ports:
+      - "${MCP_PORT:-8000}:8000"
+    environment:
+      MCP_TRANSPORT: ${MCP_TRANSPORT:-sse}
+      MCP_HOST: "0.0.0.0"
+      MCP_PORT: "8000"
+      IUDX_BASE_URL: ${IUDX_BASE_URL:-https://v2.dev.controlplane.iudx.io}
+    restart: unless-stopped
+    healthcheck:
+      test: >
+        python -c "
+        import urllib.request, sys;
+        urllib.request.urlopen('http://localhost:8000/sse', timeout=4);
+        sys.exit(0)
+        " 2>/dev/null || exit 1
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
