@@ -14,6 +14,7 @@ ENV MCP_TRANSPORT=sse
 ENV MCP_HOST=0.0.0.0
 ENV MCP_PORT=8000
 ENV IUDX_BASE_URL=https://v2.dev.controlplane.iudx.io
+ENV RS_BASE_URL=https://v2.dev.rs.iudx.io
 
 EXPOSE 8000
 

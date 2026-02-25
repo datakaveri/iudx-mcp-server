@@ -1,6 +1,6 @@
 # IUDX MCP Server
 
-A [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server for the [Intelligent Universal Data Exchange (IUDX)](https://dataforpublicgood.org.in/technology/) platform. It exposes the full IUDX Control Plane API as **55 Tools**, **8 Resources**, and **8 Prompts**, enabling AI assistants (Claude Desktop, Claude Code, and any MCP-compatible client) to discover, access, and manage IUDX datasets, AI models, organisations, and subscriptions through natural language.
+A [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server for the [Intelligent Universal Data Exchange (IUDX)](https://dataforpublicgood.org.in/technology/) platform. It exposes the full IUDX **Control Plane** and **Resource Server** APIs as **67 Tools**, **8 Resources**, and **11 Prompts**, enabling AI assistants (Claude Desktop, Claude Code, and any MCP-compatible client) to discover, access, query, and ingest IUDX datasets, AI models, organisations, and subscriptions through natural language.
 
 ---
 
@@ -34,6 +34,8 @@ A [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server for the
   - [Subscriptions](#subscriptions)
   - [Asset Access Requests](#asset-access-requests)
   - [Compute Requests](#compute-requests)
+  - [Resource Server — Data Query](#resource-server--data-query)
+  - [Resource Server — Data Ingestion](#resource-server--data-ingestion)
 - [Resources Reference](#resources-reference)
 - [Prompts Reference](#prompts-reference)
 - [Usage Examples](#usage-examples)
@@ -234,11 +236,13 @@ All variables can be set in the shell, a `.env` file next to `docker-compose.yml
 | `MCP_HOST` | `0.0.0.0` | Bind address (SSE / streamable-http only) |
 | `MCP_PORT` | `8000` | Listen port (SSE / streamable-http only) |
 | `IUDX_BASE_URL` | `https://v2.dev.controlplane.iudx.io` | IUDX Control Plane base URL |
+| `RS_BASE_URL` | `https://v2.dev.rs.iudx.io` | IUDX Resource Server base URL |
 
 **Example `.env` file:**
 
 ```env
 IUDX_BASE_URL=https://v2.prod.controlplane.iudx.io
+RS_BASE_URL=https://v2.prod.rs.iudx.io
 MCP_PORT=9000
 ```
 
@@ -314,7 +318,7 @@ claude mcp add iudx \
 
 ## Authentication
 
-Most read endpoints are **public** (no token needed). Write operations and org/admin endpoints require a Bearer JWT issued by the IUDX Keycloak Identity Provider.
+Most Control Plane read endpoints are **public** (no token needed). All Resource Server endpoints require a Bearer JWT. Write operations and org/admin endpoints require specific roles.
 
 Obtain a token with the `get_token` tool:
 
@@ -515,6 +519,80 @@ All public — no authentication required.
 
 ---
 
+### Resource Server — Data Query
+
+These tools call the **IUDX Resource Server** (`RS_BASE_URL`). All require a Bearer JWT. They support [NGSI-LD](https://www.etsi.org/technologies/internet-of-things/ngsi-ld) temporal, spatial, and attribute query patterns.
+
+| Tool | HTTP | Description |
+|---|---|---|
+| `rs_get_temporal_entities` | `GET /ngsi-ld/v1/temporal/entities` | Time-series query with optional spatial and attribute filters |
+| `rs_post_temporal_query` | `POST /ngsi-ld/v1/temporal/entityOperations/query` | Complex temporal + spatial + attribute POST query |
+| `rs_get_entities` | `GET /ngsi-ld/v1/entities` | Spatial and attribute entity snapshot query |
+| `rs_post_entities_query` | `POST /ngsi-ld/v1/entityOperations/query` | Complex spatial/attribute POST query |
+| `rs_get_latest_entity_data` | `GET /ngsi-ld/v2/entities/{id}` | Retrieve the most recent records for a resource |
+| `rs_search_entity_data` | `POST /ngsi-ld/v2/entities/{id}/search` | Advanced multi-criteria search (term, range, temporal, geo) |
+| `rs_download_entity_data` | `GET /ngsi-ld/v2/{id}/download` | Download all data as CSV |
+| `rs_download_entity_data_post` | `POST /ngsi-ld/v2/{id}/download` | Download filtered data as CSV |
+| `rs_create_elasticsearch_index` | `POST /admin/elasticsearch/createIndex` | Admin: create backing Elasticsearch index for a dataset |
+
+<details>
+<summary><code>rs_get_temporal_entities</code> — parameter reference</summary>
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `resource_id` | `str` | required | UUID of the IUDX resource |
+| `timerel` | `str` | required | `between` \| `before` \| `after` |
+| `time_at` | `str` | required | ISO-8601 start timestamp |
+| `token` | `str` | required | Bearer JWT |
+| `end_time_at` | `str` | `""` | ISO-8601 end (required when `timerel=between`) |
+| `time_property` | `str` | `observationDateTime` | `observationDateTime` or `observedAt` |
+| `limit` | `int` | `100` | Max records; `limit+offset ≤ 10 000` |
+| `offset` | `int` | `0` | Records to skip |
+| `last_n` | `int` | `0` | Return only the last N observations |
+| `count` | `bool` | `false` | Include total count in response |
+| `q` | `str` | `""` | Attribute filter e.g. `"speed>30.0;temp<=25"` |
+| `omit` | `str` | `""` | Comma-separated properties to exclude (max 5) |
+| `order_by` | `str` | `""` | Sort e.g. `"observationDateTime:desc"` |
+| `pick` | `str` | `""` | Comma-separated properties to include (max 5) |
+| `geometry` | `str` | `""` | `Point` \| `Polygon` \| `LineString` \| `bbox` |
+| `coordinates` | `str` | `""` | GeoJSON coordinate string |
+| `georel` | `str` | `""` | `near;maxDistance=<m>` \| `within` \| `intersects` |
+| `format` | `str` | `""` | `"simplified"` strips NGSI-LD wrappers |
+| `options` | `str` | `""` | `"aggregatedValues"` for statistical aggregation |
+| `aggr_methods` | `str` | `""` | Comma-separated: `totalCount,min,max,avg,sum,stddev,distinctCount` |
+| `did` | `str` | `""` | Delegation ID header (optional) |
+
+</details>
+
+<details>
+<summary><code>rs_search_entity_data</code> — searchCriteria reference</summary>
+
+| `searchType` | Description | `values` format |
+|---|---|---|
+| `term` | Exact/fuzzy property match | One or more match values |
+| `betweenRange` | Numeric range | `[min, max]` |
+| `beforeRange` | Numeric less-than | `[max]` |
+| `afterRange` | Numeric greater-than | `[min]` |
+| `betweenTemporal` | ISO-8601 date range | `["start", "end"]` |
+| `beforeTemporal` | Before a date | `["date"]` |
+| `afterTemporal` | After a date | `["date"]` |
+
+</details>
+
+---
+
+### Resource Server — Data Ingestion
+
+| Tool | HTTP | Description |
+|---|---|---|
+| `rs_ingest_entities` | `POST /ngsi-ld/v1/ingestion/entities` | Publish data; resource ID embedded in each record as `"entities"` field |
+| `rs_ingest_entities_on_seek` | `POST /ngsi-ld/v1/ingestion/entities/{id}/on-seek` | Seekable streaming ingestion for a resource |
+| `rs_ingest_entities_publish` | `POST /ngsi-ld/v1/ingestion/entities/{id}` | Standard publish; resource ID as path parameter |
+
+All ingestion tools require a Bearer JWT with data-ingestion privileges. Data must be a JSON array with at minimum an `observationDateTime` field (ISO-8601 with timezone offset).
+
+---
+
 ## Resources Reference
 
 Resources are **read-only, URI-addressable** data sources backed by public IUDX endpoints. They provide ambient context to an LLM without requiring tool calls.
@@ -617,6 +695,40 @@ Sets up a data subscription: verifies access, then calls `create_subscription`.
 
 ---
 
+### `query_resource_data`
+
+Guides the user through querying time-series or spatial data from the Resource Server. Chooses between temporal GET, temporal POST (for spatial filters), and latest-data GET based on the user's needs.
+
+| Parameter | Required | Description |
+|---|---|---|
+| `resource_id` | yes | UUID of the IUDX resource |
+| `timerel` | no | Time relationship hint — `between`, `before`, or `after` (default `before`) |
+| `time_at` | no | ISO-8601 timestamp hint (defaults to current UTC time) |
+
+---
+
+### `download_resource_data`
+
+Guides the user through downloading resource data as CSV, with optional temporal filtering.
+
+| Parameter | Required | Description |
+|---|---|---|
+| `resource_id` | yes | UUID of the IUDX resource |
+| `start_time` | no | ISO-8601 start for filtering e.g. `"2024-01-01T00:00:00Z"` |
+| `end_time` | no | ISO-8601 end for filtering |
+
+---
+
+### `ingest_resource_data`
+
+Guides a data provider through publishing observations to an IUDX resource, including choosing the right ingestion endpoint.
+
+| Parameter | Required | Description |
+|---|---|---|
+| `resource_id` | yes | UUID of the IUDX resource to publish data to |
+
+---
+
 ## Usage Examples
 
 ### Search for open air-quality datasets
@@ -672,6 +784,85 @@ iudx://catalogue/datasets/<uuid>   # metadata for one item
 iudx://leaderboard/assets          # top assets by usage
 ```
 
+### Query time-series data from the Resource Server
+
+```python
+# Get the last 200 temperature readings before a timestamp
+rs_get_temporal_entities(
+    resource_id="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+    timerel="before",
+    time_at="2024-06-01T00:00:00Z",
+    token="<bearer-jwt>",
+    limit=200,
+    q="temperature>25.0",
+    pick="observationDateTime,temperature,humidity",
+    format="simplified",
+)
+```
+
+### Temporal POST query with spatial filter
+
+```python
+rs_post_temporal_query(
+    query_json='''{
+      "type": "Query",
+      "entities": [{"id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"}],
+      "temporalQ": {
+        "timerel": "between",
+        "timeAt": "2024-01-01T00:00:00Z",
+        "endTimeAt": "2024-01-07T23:59:59Z",
+        "timeproperty": "observationDateTime"
+      },
+      "geoQ": {
+        "geometry": "Point",
+        "coordinates": [72.834, 21.178],
+        "georel": "near;maxDistance=2000",
+        "geoproperty": "location"
+      },
+      "pick": "id,observationDateTime,speed,location"
+    }''',
+    token="<bearer-jwt>",
+    format="simplified",
+)
+```
+
+### Get latest data snapshot
+
+```python
+rs_get_latest_entity_data(
+    resource_id="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+    token="<bearer-jwt>",
+    size=20,
+    sort="observationDateTime:desc",
+)
+```
+
+### Download filtered data as CSV
+
+```python
+rs_download_entity_data_post(
+    resource_id="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+    search_criteria_json='''{
+      "searchCriteria": [
+        {"searchType": "betweenTemporal", "field": "observationDateTime",
+         "values": ["2024-01-01T00:00:00Z", "2024-01-31T23:59:59Z"]}
+      ]
+    }''',
+    token="<bearer-jwt>",
+    sort="observationDateTime:asc",
+)
+```
+
+### Ingest data into a resource
+
+```python
+rs_ingest_entities_publish(
+    resource_id="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+    data_json='[{"observationDateTime": "2024-06-01T10:30:00+05:30", "temperature": 28.5, "humidity": 65.2}]',
+    token="<bearer-jwt>",
+)
+```
+
 ---
 
 ## Project Structure
@@ -689,13 +880,17 @@ iudx-mcp-server/
 ### Key design decisions
 
 - **Configurable transport** — `MCP_TRANSPORT=stdio` for local / embedded use; `sse` or `streamable-http` for networked / Docker deployments. Controlled entirely by environment variable, no code change needed.
-- **`IUDX_BASE_URL` env var** — Point the server at any IUDX environment (dev, staging, prod) without rebuilding the image.
-- **`json.loads` for complex payloads** — IUDX item bodies are large, schema-variable JSON objects. Accepting them as raw JSON strings (parsed internally with `_parse()`) avoids an explosion of keyword parameters and works for all current and future IUDX entity types.
+- **Two base URLs** — `IUDX_BASE_URL` for the Control Plane (catalogue, auth, orgs) and `RS_BASE_URL` for the Resource Server (time-series query and ingestion). Each can be pointed independently at dev, staging, or production.
+- **`json.loads` for complex payloads** — IUDX item bodies and RS query objects are large, schema-variable JSON objects. Accepting them as raw JSON strings (parsed internally with `_parse()`) avoids an explosion of keyword parameters and works for all current and future IUDX entity types.
 - **Token as a parameter** — Every authenticated tool accepts an explicit `token: str` argument rather than reading from environment variables, keeping the server stateless and easy to test.
 - **Resources are public only** — Resources are URI-addressable and cacheable; only unauthenticated public endpoints are exposed as resources. Auth-gated data is exposed exclusively through tools.
+- **CSV helpers** — RS download endpoints return `text/csv` instead of JSON. Dedicated `_rs_get_text` / `_rs_post_text` helpers handle these and return raw CSV strings with a 120-second timeout.
 
 ---
 
 ## API Reference
 
-Full OpenAPI specification: `https://v2.dev.controlplane.iudx.io/apis`
+| API | Specification |
+|---|---|
+| Control Plane | `https://v2.dev.controlplane.iudx.io/apis` |
+| Resource Server | `https://v2.dev.rs.iudx.io/apis` |
