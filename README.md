@@ -39,6 +39,11 @@ A [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server for the
 - [Resources Reference](#resources-reference)
 - [Prompts Reference](#prompts-reference)
 - [Usage Examples](#usage-examples)
+- [Example Client](#example-client)
+  - [Run modes](#run-modes)
+  - [Stdio transport](#stdio-transport)
+  - [SSE transport](#sse-transport)
+  - [RS tools](#rs-tools)
 - [Project Structure](#project-structure)
 
 ---
@@ -865,6 +870,114 @@ rs_ingest_entities_publish(
 
 ---
 
+## Example Client
+
+`examples/example_client.py` is a self-contained Python script that shows how to connect to the IUDX MCP server programmatically using the official `mcp` Python SDK.
+
+### Run modes
+
+| Mode | Command | When to use |
+|---|---|---|
+| `stdio` | `python examples/example_client.py stdio` | Local dev — server started automatically as a subprocess |
+| `sse` | `python examples/example_client.py sse [url]` | Server already running via Docker / `MCP_TRANSPORT=sse` |
+| `http` | `python examples/example_client.py http [url]` | Streamable-HTTP transport (MCP ≥ 1.3) |
+
+### Stdio transport
+
+The simplest way to get started — no server process needed:
+
+```bash
+# Install dependencies
+python3 -m venv .venv && source .venv/bin/activate
+pip install "mcp[cli]" httpx
+
+# Run the example
+python examples/example_client.py stdio
+```
+
+Expected output:
+
+```
+Transport: stdio  (spawning server.py)
+
+──────────────────────────────────────────────────────────
+  Available tools (67 total)
+──────────────────────────────────────────────────────────
+["search_catalogue", "get_cat_item", ..., "rs_ingest_entities_publish"]
+
+──────────────────────────────────────────────────────────
+  count_catalogue_entities
+──────────────────────────────────────────────────────────
+{"type": "dx:controlPlane:success", "result": [{"adex:DataBank": 50, ...}]}
+
+✓  Demo complete
+```
+
+### SSE transport
+
+Start the server first, then connect:
+
+```bash
+# Terminal 1 — start server
+MCP_TRANSPORT=sse python server.py
+
+# Terminal 2 — run client
+python examples/example_client.py sse http://localhost:8000/sse
+```
+
+Or against a Docker deployment:
+
+```bash
+docker compose up -d
+python examples/example_client.py sse http://localhost:8000/sse
+```
+
+### RS tools
+
+The RS tool examples in the client are commented out because they require a Bearer JWT. To enable them:
+
+1. Obtain a token:
+
+```python
+result = await session.call_tool("get_token", {
+    "credentials_json": '{"username": "you@example.com", "password": "secret"}'
+})
+token = json.loads(result.content[0].text)["result"]["access_token"]
+```
+
+2. Uncomment and fill in the RS section in `example_client.py`:
+
+```python
+TOKEN = "<token from step 1>"
+RESOURCE_ID = "<uuid from catalogue>"
+
+result = await session.call_tool("rs_get_latest_entity_data", {
+    "resource_id": RESOURCE_ID,
+    "token": TOKEN,
+    "size": 5,
+    "sort": "observationDateTime:desc",
+})
+
+result = await session.call_tool("rs_get_temporal_entities", {
+    "resource_id": RESOURCE_ID,
+    "timerel": "between",
+    "time_at": "2024-01-01T00:00:00Z",
+    "end_time_at": "2024-01-07T23:59:59Z",
+    "token": TOKEN,
+    "limit": 10,
+    "format": "simplified",
+})
+
+result = await session.call_tool("rs_download_entity_data", {
+    "resource_id": RESOURCE_ID,
+    "token": TOKEN,
+    "sort": "observationDateTime:asc",
+})
+# → returns raw CSV text
+```
+
+---
+
 ## Project Structure
 
 ```
@@ -874,7 +987,9 @@ iudx-mcp-server/
 ├── Dockerfile           # Container image (SSE transport by default)
 ├── docker-compose.yml   # Single-service Compose stack
 ├── .dockerignore        # Files excluded from the Docker build context
-└── README.md            # This file
+├── README.md            # This file
+└── examples/
+    └── example_client.py  # Programmatic MCP client (stdio / SSE / HTTP)
 ```
 
 ### Key design decisions
