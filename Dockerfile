@@ -19,13 +19,6 @@ ENV RS_BASE_URL=https://v2.dev.rs.iudx.io
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD python - <<'EOF'
-import urllib.request, sys
-try:
-    urllib.request.urlopen("http://localhost:8000/sse", timeout=4)
-    sys.exit(0)
-except Exception:
-    sys.exit(1)
-EOF
+  CMD python -c "import urllib.request, sys; urllib.request.urlopen('http://localhost:8000/sse', timeout=4); sys.exit(0)"
 
 CMD ["python", "server.py"]
