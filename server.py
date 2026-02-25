@@ -2044,7 +2044,9 @@ def main() -> None:
         transport, BASE_URL, RS_BASE_URL,
     )
     if transport in ("sse", "streamable-http"):
-        mcp.run(transport=transport, host=host, port=port)
+        mcp.settings.host = host
+        mcp.settings.port = port
+        mcp.run(transport=transport)
     else:
         mcp.run(transport="stdio")
 
