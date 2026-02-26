@@ -1,6 +1,6 @@
 # IUDX MCP Server
 
-A [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server for the [Intelligent Universal Data Exchange (IUDX)](https://dataforpublicgood.org.in/technology/) platform. It exposes the full IUDX **Control Plane** and **Resource Server** APIs as **67 Tools**, **7 Resources** (+ 1 resource template), and **11 Prompts**, enabling AI assistants (Claude Desktop, Claude Code, and any MCP-compatible client) to discover, access, query, and ingest IUDX datasets, AI models, organisations, and subscriptions through natural language.
+A [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server for the [Intelligent Universal Data Exchange (IUDX)](https://dataforpublicgood.org.in/technology/) platform. It exposes the full IUDX **Control Plane**, **Resource Server**, and **Resource Server Proxy** APIs as **75 Tools**, **8 Resources** (+ 1 resource template), and **13 Prompts**, enabling AI assistants (Claude Desktop, Claude Code, and any MCP-compatible client) to discover, access, query, and ingest IUDX datasets, AI models, organisations, and subscriptions through natural language.
 
 ---
 
@@ -36,6 +36,8 @@ A [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server for the
   - [Compute Requests](#compute-requests)
   - [Resource Server — Data Query](#resource-server--data-query)
   - [Resource Server — Data Ingestion](#resource-server--data-ingestion)
+  - [Resource Server Proxy — Spatial Query](#resource-server-proxy--spatial-query)
+  - [Resource Server Proxy — Temporal Query](#resource-server-proxy--temporal-query)
 - [Resources Reference](#resources-reference)
 - [Prompts Reference](#prompts-reference)
 - [Usage Examples](#usage-examples)
@@ -195,6 +197,7 @@ docker run -p 8000:8000 iudx-mcp-server
 docker run -p 8000:8000 \
   -e IUDX_BASE_URL=https://v2.prod.controlplane.iudx.io \
   -e RS_BASE_URL=https://v2.prod.rs.iudx.io \
+  -e RSP_BASE_URL=https://v2.prod.rs.iudx.io/rsp \
   iudx-mcp-server
 
 # Run in stdio mode (for use as a Docker-based MCP client command)
@@ -228,6 +231,7 @@ docker compose down
 # Point to production IUDX
 IUDX_BASE_URL=https://v2.prod.controlplane.iudx.io \
   RS_BASE_URL=https://v2.prod.rs.iudx.io \
+  RSP_BASE_URL=https://v2.prod.rs.iudx.io/rsp \
   docker compose up -d
 ```
 
@@ -244,12 +248,14 @@ All variables can be set in the shell, a `.env` file next to `docker-compose.yml
 | `MCP_PORT` | `8000` | Listen port (SSE / streamable-http only) |
 | `IUDX_BASE_URL` | `https://v2.dev.controlplane.iudx.io` | IUDX Control Plane base URL |
 | `RS_BASE_URL` | `https://v2.dev.rs.iudx.io` | IUDX Resource Server base URL |
+| `RSP_BASE_URL` | `https://v2.dev.rs.iudx.io/rsp` | IUDX Resource Server Proxy base URL |
 
 **Example `.env` file:**
 
 ```env
 IUDX_BASE_URL=https://v2.prod.controlplane.iudx.io
 RS_BASE_URL=https://v2.prod.rs.iudx.io
+RSP_BASE_URL=https://v2.prod.rs.iudx.io/rsp
 MCP_PORT=9000
 ```
 
@@ -597,6 +603,32 @@ All ingestion tools require a Bearer JWT with data-ingestion privileges. Data mu
 
 ---
 
+### Resource Server Proxy — Spatial Query
+
+These tools call the **IUDX Resource Server Proxy** (`RSP_BASE_URL`) which routes requests through the IUDX data plane proxy layer. Bearer JWT is optional for OPEN resources, required for SECURE resources. Both NGSI-LD v1 and v2 variants are available; v2 adds field projection, ordering, pagination, and format selection.
+
+| Tool | HTTP | Description |
+|---|---|---|
+| `rsp_get_entities_v1` | `GET /ngsi-ld/v1/entities` | Spatial entity snapshot query (geo filter + attribute filter) |
+| `rsp_get_entities_v2` | `GET /ngsi-ld/v2/entities` | Spatial query with pick/omit, ordering, count, and format options |
+| `rsp_post_entities_query_v1` | `POST /ngsi-ld/v1/entityOperations/query` | Complex spatial POST query (large polygons, multiple filters) |
+| `rsp_post_entities_query_v2` | `POST /ngsi-ld/v2/entityOperations/query` | Enhanced spatial POST query with pagination and projection in query params |
+
+---
+
+### Resource Server Proxy — Temporal Query
+
+| Tool | HTTP | Description |
+|---|---|---|
+| `rsp_get_temporal_entities_v1` | `GET /ngsi-ld/v1/temporal/entities` | Temporal query using `time`/`endtime` params (NGSI-LD v1) |
+| `rsp_get_temporal_entities_v2` | `GET /ngsi-ld/v2/temporal/entities` | Temporal query with `timeAt`/`endTimeAt`, pick/omit, ordering, and format |
+| `rsp_post_temporal_query_v1` | `POST /ngsi-ld/v1/temporal/entityOperations/query` | Complex temporal+spatial POST query (v1, uses `time`/`endtime` in body) |
+| `rsp_post_temporal_query_v2` | `POST /ngsi-ld/v2/temporal/entityOperations/query` | Enhanced temporal+spatial POST query with full v2 controls |
+
+> **v1 vs v2 time parameters:** v1 GET uses `time`/`endtime`; v2 GET uses `timeAt`/`endTimeAt`. In POST bodies: v1 `temporalQ` uses `time`/`endtime`; v2 `temporalQ` uses `timeAt`/`endTimeAt`.
+
+---
+
 ## Resources Reference
 
 Resources are **read-only, URI-addressable** data sources backed by public IUDX endpoints. They provide ambient context to an LLM without requiring tool calls.
@@ -613,11 +645,12 @@ Resources are **read-only, URI-addressable** data sources backed by public IUDX 
 | `iudx://leaderboard/providers` | Top data providers | `GET /iudx/v2/leaderboard/provider` |
 | `iudx://leaderboard/organizations` | Top organisations | `GET /iudx/v2/leaderboard/organization` |
 
-**Resource template** (read by supplying a UUID):
+**Resource templates** (read by supplying a UUID):
 
 | URI Template | Description | Backing Endpoint |
 |---|---|---|
 | `iudx://catalogue/datasets/{id}` | Full metadata for a specific item by UUID | `GET /iudx/v2/cat/item` |
+| `iudx://rsp/entities/{id}` | Latest 10 entity records for a resource via RSP v2 | `GET /rsp/ngsi-ld/v2/entities` |
 
 ---
 
@@ -737,6 +770,32 @@ Guides a data provider through publishing observations to an IUDX resource, incl
 | Parameter | Required | Description |
 |---|---|---|
 | `resource_id` | yes | UUID of the IUDX resource to publish data to |
+
+---
+
+### `rsp_query_spatial_data`
+
+Guides the user through a spatial entity query via the Resource Server Proxy, choosing between GET (simple) and POST (complex body) endpoints, and offering to refine results.
+
+| Parameter | Required | Description |
+|---|---|---|
+| `resource_id` | yes | UUID of the IUDX resource |
+| `georel` | no | Geo-relationship hint: `within`, `near`, `intersects`, etc. (default `within`) |
+| `geometry` | no | Geometry type hint: `Polygon`, `Point`, etc. (default `Polygon`) |
+| `coordinates` | no | GeoJSON coordinates string. If omitted, user is asked for them. |
+
+---
+
+### `rsp_query_temporal_data`
+
+Guides the user through a temporal time-series query via the Resource Server Proxy, with optional spatial filtering using a combined POST body.
+
+| Parameter | Required | Description |
+|---|---|---|
+| `resource_id` | yes | UUID of the IUDX resource |
+| `timerel` | no | Temporal relationship: `between`, `before`, or `after` (default `between`) |
+| `time_at` | no | ISO-8601 anchor timestamp. If omitted, user is asked. |
+| `end_time_at` | no | ISO-8601 end timestamp. Required when `timerel=between`. |
 
 ---
 
@@ -874,6 +933,71 @@ rs_ingest_entities_publish(
 )
 ```
 
+### Spatial query via the Resource Server Proxy (RSP v2)
+
+```python
+# GET — entities within a polygon
+rsp_get_entities_v2(
+    resource_id="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+    georel="within",
+    geometry="Polygon",
+    coordinates="[[[77.0,12.0],[78.0,12.0],[78.0,13.0],[77.0,13.0],[77.0,12.0]]]",
+    q="AQI>100",
+    pick="id,observationDateTime,AQI,location",
+    format="simplified",
+    count=True,
+)
+
+# POST — near a point with field projection in body
+rsp_post_entities_query_v2(
+    query_json='''{
+      "entities": [{"id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"}],
+      "geoQ": {
+        "georel": "near;maxDistance=500",
+        "geometry": "Point",
+        "coordinates": [77.5946, 12.9716]
+      },
+      "pick": "id,observationDateTime,temperature"
+    }''',
+    limit=50,
+    format="simplified",
+)
+```
+
+### Temporal query via the Resource Server Proxy (RSP v2)
+
+```python
+# GET — time range query
+rsp_get_temporal_entities_v2(
+    resource_id="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+    timerel="between",
+    time_at="2024-01-01T00:00:00Z",
+    end_time_at="2024-01-07T23:59:59Z",
+    q="temperature>25",
+    format="simplified",
+    order_by="observationDateTime:asc",
+)
+
+# POST — temporal + spatial combined query
+rsp_post_temporal_query_v2(
+    query_json='''{
+      "entities": [{"id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"}],
+      "temporalQ": {
+        "timerel": "between",
+        "timeAt": "2024-01-01T00:00:00Z",
+        "endTimeAt": "2024-01-07T23:59:59Z"
+      },
+      "geoQ": {
+        "georel": "within",
+        "geometry": "Polygon",
+        "coordinates": [[[77.0,12.0],[78.0,12.0],[78.0,13.0],[77.0,13.0],[77.0,12.0]]]
+      }
+    }''',
+    format="simplified",
+    count=True,
+)
+```
+
 ---
 
 ## Example Client
@@ -907,9 +1031,9 @@ Expected output:
 Transport: stdio  (spawning server.py)
 
 ──────────────────────────────────────────────────────────
-  Available tools (67 total)
+  Available tools (75 total)
 ──────────────────────────────────────────────────────────
-["search_catalogue", "get_cat_item", ..., "rs_ingest_entities_publish"]
+["search_catalogue", "get_cat_item", ..., "rsp_post_temporal_query_v2"]
 
 ──────────────────────────────────────────────────────────
   count_catalogue_entities
@@ -1001,7 +1125,7 @@ iudx-mcp-server/
 ### Key design decisions
 
 - **Configurable transport** — `MCP_TRANSPORT=stdio` for local / embedded use; `sse` or `streamable-http` for networked / Docker deployments. Controlled entirely by environment variable, no code change needed.
-- **Two base URLs** — `IUDX_BASE_URL` for the Control Plane (catalogue, auth, orgs) and `RS_BASE_URL` for the Resource Server (time-series query and ingestion). Each can be pointed independently at dev, staging, or production.
+- **Three base URLs** — `IUDX_BASE_URL` for the Control Plane (catalogue, auth, orgs), `RS_BASE_URL` for the Resource Server (time-series query and ingestion), and `RSP_BASE_URL` for the Resource Server Proxy (NGSI-LD v1/v2 spatial and temporal search via the IUDX data plane proxy). Each can be pointed independently at dev, staging, or production.
 - **`json.loads` for complex payloads** — IUDX item bodies and RS query objects are large, schema-variable JSON objects. Accepting them as raw JSON strings (parsed internally with `_parse()`) avoids an explosion of keyword parameters and works for all current and future IUDX entity types.
 - **Token as a parameter** — Every authenticated tool accepts an explicit `token: str` argument rather than reading from environment variables, keeping the server stateless and easy to test.
 - **Resources are public only** — Resources are URI-addressable and cacheable; only unauthenticated public endpoints are exposed as resources. Auth-gated data is exposed exclusively through tools.
@@ -1015,3 +1139,4 @@ iudx-mcp-server/
 |---|---|
 | Control Plane | `https://v2.dev.controlplane.iudx.io/apis` |
 | Resource Server | `https://v2.dev.rs.iudx.io/apis` |
+| Resource Server Proxy | `https://v2.dev.rs.iudx.io/rsp/apis` |
