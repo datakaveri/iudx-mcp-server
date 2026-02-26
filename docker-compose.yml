@@ -13,6 +13,7 @@ services:
       MCP_PORT: "8000"
       IUDX_BASE_URL: ${IUDX_BASE_URL:-https://v2.dev.controlplane.iudx.io}
       RS_BASE_URL: ${RS_BASE_URL:-https://v2.dev.rs.iudx.io}
+      RSP_BASE_URL: ${RSP_BASE_URL:-https://v2.dev.rs.iudx.io/rsp}
     restart: unless-stopped
     healthcheck:
       test: >

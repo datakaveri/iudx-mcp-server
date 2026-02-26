@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 
 BASE_URL = os.getenv("IUDX_BASE_URL", "https://v2.dev.controlplane.iudx.io")
 RS_BASE_URL = os.getenv("RS_BASE_URL", "https://v2.dev.rs.iudx.io")
+RSP_BASE_URL = os.getenv("RSP_BASE_URL", "https://v2.dev.rs.iudx.io/rsp")
 
 mcp = FastMCP("IUDX MCP Server")
 
@@ -184,6 +185,41 @@ async def _rs_post_text(
         r = await c.post(url, params=params, json=body, headers=_rs_headers(token, did))
         r.raise_for_status()
         return r.text
+
+
+# ---------------------------------------------------------------------------
+# Resource Server Proxy (RSP) HTTP helpers
+# ---------------------------------------------------------------------------
+
+async def _rsp_get(
+    path: str,
+    *,
+    token: str = "",
+    did: str = "",
+    params: dict[str, Any] | None = None,
+) -> dict:
+    url = f"{RSP_BASE_URL}{path}"
+    logger.info("RSP GET %s params=%s", url, params)
+    async with httpx.AsyncClient(timeout=60) as c:
+        r = await c.get(url, params=params, headers=_rs_headers(token, did))
+        r.raise_for_status()
+        return r.json()
+
+
+async def _rsp_post(
+    path: str,
+    *,
+    token: str = "",
+    did: str = "",
+    params: dict[str, Any] | None = None,
+    body: Any = None,
+) -> dict:
+    url = f"{RSP_BASE_URL}{path}"
+    logger.info("RSP POST %s params=%s", url, params)
+    async with httpx.AsyncClient(timeout=60) as c:
+        r = await c.post(url, params=params, json=body, headers=_rs_headers(token, did))
+        r.raise_for_status()
+        return r.json()
 
 
 # ===========================================================================
@@ -1648,6 +1684,463 @@ async def rs_ingest_entities_publish(
     )
 
 
+# ---------------------------------------------------------------------------
+# Resource Server Proxy (RSP) tools
+# ---------------------------------------------------------------------------
+
+@mcp.tool()
+async def rsp_get_entities_v1(
+    resource_id: str,
+    token: str = "",
+    did: str = "",
+    georel: str = "",
+    geometry: str = "",
+    coordinates: str = "",
+    geoproperty: str = "",
+    q: str = "",
+    attrs: str = "",
+    limit: int = 0,
+    offset: int = 0,
+) -> dict:
+    """Spatial entity search via RSP v1 (GET /ngsi-ld/v1/entities).
+
+    Searches for entities matching geo and/or attribute filter criteria through
+    the IUDX Resource Server Proxy.
+
+    Args:
+        resource_id: IUDX resource ID (UUID).
+        token:       Optional Bearer JWT. Required for SECURE resources.
+        did:         Optional delegation ID header.
+        georel:      Geo-relationship: near, within, contains, intersects, equals, disjoint,
+                     overlaps. Use 'near;maxDistance=500' for proximity.
+        geometry:    Geometry type: Point, Polygon, LineString, etc.
+        coordinates: GeoJSON coordinates string, e.g. '[77.5946,12.9716]'.
+        geoproperty: Property to apply geo filter on (default: location).
+        q:           NGSI-LD query expression, e.g. 'temperature>25;humidity<80'.
+        attrs:       Comma-separated list of attribute names to return.
+        limit:       Max number of results.
+        offset:      Result offset for pagination.
+    """
+    params: dict[str, Any] = {"id": resource_id}
+    if georel:
+        params["georel"] = georel
+    if geometry:
+        params["geometry"] = geometry
+    if coordinates:
+        params["coordinates"] = coordinates
+    if geoproperty:
+        params["geoproperty"] = geoproperty
+    if q:
+        params["q"] = q
+    if attrs:
+        params["attrs"] = attrs
+    if limit > 0:
+        params["limit"] = limit
+    if offset > 0:
+        params["offset"] = offset
+    return await _rsp_get("/ngsi-ld/v1/entities", token=token, did=did, params=params)
+
+
+@mcp.tool()
+async def rsp_get_entities_v2(
+    resource_id: str,
+    token: str = "",
+    did: str = "",
+    georel: str = "",
+    geometry: str = "",
+    coordinates: str = "",
+    geoproperty: str = "",
+    q: str = "",
+    attrs: str = "",
+    pick: str = "",
+    omit: str = "",
+    limit: int = 0,
+    offset: int = 0,
+    format: str = "",
+    count: bool = False,
+    order_by: str = "",
+) -> dict:
+    """Spatial entity search via RSP v2 (GET /ngsi-ld/v2/entities).
+
+    Enhanced spatial search with additional controls: field projection (pick/omit),
+    result ordering, format selection, and total-count option.
+
+    Args:
+        resource_id: IUDX resource ID (UUID).
+        token:       Optional Bearer JWT. Required for SECURE resources.
+        did:         Optional delegation ID header.
+        georel:      Geo-relationship: near, within, contains, intersects, etc.
+        geometry:    Geometry type: Point, Polygon, LineString, etc.
+        coordinates: GeoJSON coordinates string, e.g. '[77.5946,12.9716]'.
+        geoproperty: Property to apply geo filter on (default: location).
+        q:           NGSI-LD query expression, e.g. 'temperature>25'.
+        attrs:       Comma-separated attribute names to return.
+        pick:        Comma-separated top-level fields to include in response.
+        omit:        Comma-separated top-level fields to exclude from response.
+        limit:       Max number of results.
+        offset:      Result offset for pagination.
+        format:      Response format: 'simplified' or 'ngsi-ld'.
+        count:       If True, include total count in response.
+        order_by:    Field to sort by, e.g. 'observationDateTime:desc'.
+    """
+    params: dict[str, Any] = {"id": resource_id}
+    if georel:
+        params["georel"] = georel
+    if geometry:
+        params["geometry"] = geometry
+    if coordinates:
+        params["coordinates"] = coordinates
+    if geoproperty:
+        params["geoproperty"] = geoproperty
+    if q:
+        params["q"] = q
+    if attrs:
+        params["attrs"] = attrs
+    if pick:
+        params["pick"] = pick
+    if omit:
+        params["omit"] = omit
+    if limit > 0:
+        params["limit"] = limit
+    if offset > 0:
+        params["offset"] = offset
+    if format:
+        params["format"] = format
+    if count:
+        params["count"] = "true"
+    if order_by:
+        params["orderBy"] = order_by
+    return await _rsp_get("/ngsi-ld/v2/entities", token=token, did=did, params=params)
+
+
+@mcp.tool()
+async def rsp_get_temporal_entities_v1(
+    resource_id: str,
+    timerel: str,
+    time: str,
+    token: str = "",
+    did: str = "",
+    end_time: str = "",
+    georel: str = "",
+    geometry: str = "",
+    coordinates: str = "",
+    geoproperty: str = "",
+    q: str = "",
+    attrs: str = "",
+    limit: int = 0,
+    offset: int = 0,
+) -> dict:
+    """Temporal entity search via RSP v1 (GET /ngsi-ld/v1/temporal/entities).
+
+    Retrieves time-series data for a resource using NGSI-LD temporal operators.
+    Uses 'time' and 'endtime' parameter names (not timeAt/endTimeAt).
+
+    Args:
+        resource_id: IUDX resource ID (UUID).
+        timerel:     Temporal relationship: between, before, or after.
+        time:        ISO-8601 anchor timestamp, e.g. '2024-01-15T00:00:00Z'.
+        token:       Optional Bearer JWT. Required for SECURE resources.
+        did:         Optional delegation ID header.
+        end_time:    ISO-8601 end timestamp. Required when timerel='between'.
+        georel:      Optional geo-relationship filter.
+        geometry:    Optional geometry type for geo filter.
+        coordinates: Optional GeoJSON coordinates for geo filter.
+        geoproperty: Property to apply geo filter on.
+        q:           NGSI-LD attribute query, e.g. 'temperature>25'.
+        attrs:       Comma-separated attributes to return.
+        limit:       Max number of results.
+        offset:      Result offset for pagination.
+    """
+    params: dict[str, Any] = {"id": resource_id, "timerel": timerel, "time": time}
+    if end_time:
+        params["endtime"] = end_time
+    if georel:
+        params["georel"] = georel
+    if geometry:
+        params["geometry"] = geometry
+    if coordinates:
+        params["coordinates"] = coordinates
+    if geoproperty:
+        params["geoproperty"] = geoproperty
+    if q:
+        params["q"] = q
+    if attrs:
+        params["attrs"] = attrs
+    if limit > 0:
+        params["limit"] = limit
+    if offset > 0:
+        params["offset"] = offset
+    return await _rsp_get("/ngsi-ld/v1/temporal/entities", token=token, did=did, params=params)
+
+
+@mcp.tool()
+async def rsp_get_temporal_entities_v2(
+    resource_id: str,
+    timerel: str,
+    time_at: str,
+    token: str = "",
+    did: str = "",
+    end_time_at: str = "",
+    time_property: str = "",
+    georel: str = "",
+    geometry: str = "",
+    coordinates: str = "",
+    geoproperty: str = "",
+    q: str = "",
+    attrs: str = "",
+    pick: str = "",
+    omit: str = "",
+    limit: int = 0,
+    offset: int = 0,
+    format: str = "",
+    count: bool = False,
+    order_by: str = "",
+) -> dict:
+    """Temporal entity search via RSP v2 (GET /ngsi-ld/v2/temporal/entities).
+
+    Enhanced temporal search with additional controls: field projection (pick/omit),
+    custom time property, result ordering, format selection, and total-count option.
+
+    Args:
+        resource_id:   IUDX resource ID (UUID).
+        timerel:       Temporal relationship: between, before, or after.
+        time_at:       ISO-8601 anchor timestamp, e.g. '2024-01-15T00:00:00Z'.
+        token:         Optional Bearer JWT. Required for SECURE resources.
+        did:           Optional delegation ID header.
+        end_time_at:   ISO-8601 end timestamp. Required when timerel='between'.
+        time_property: Name of the time property (default: observationDateTime).
+        georel:        Optional geo-relationship filter.
+        geometry:      Optional geometry type for geo filter.
+        coordinates:   Optional GeoJSON coordinates for geo filter.
+        geoproperty:   Property to apply geo filter on.
+        q:             NGSI-LD attribute query, e.g. 'temperature>25'.
+        attrs:         Comma-separated attributes to return.
+        pick:          Comma-separated top-level fields to include in response.
+        omit:          Comma-separated top-level fields to exclude from response.
+        limit:         Max number of results.
+        offset:        Result offset for pagination.
+        format:        Response format: 'simplified' or 'ngsi-ld'.
+        count:         If True, include total count in response.
+        order_by:      Field to sort by, e.g. 'observationDateTime:desc'.
+    """
+    params: dict[str, Any] = {"id": resource_id, "timerel": timerel, "timeAt": time_at}
+    if end_time_at:
+        params["endTimeAt"] = end_time_at
+    if time_property:
+        params["timeproperty"] = time_property
+    if georel:
+        params["georel"] = georel
+    if geometry:
+        params["geometry"] = geometry
+    if coordinates:
+        params["coordinates"] = coordinates
+    if geoproperty:
+        params["geoproperty"] = geoproperty
+    if q:
+        params["q"] = q
+    if attrs:
+        params["attrs"] = attrs
+    if pick:
+        params["pick"] = pick
+    if omit:
+        params["omit"] = omit
+    if limit > 0:
+        params["limit"] = limit
+    if offset > 0:
+        params["offset"] = offset
+    if format:
+        params["format"] = format
+    if count:
+        params["count"] = "true"
+    if order_by:
+        params["orderBy"] = order_by
+    return await _rsp_get("/ngsi-ld/v2/temporal/entities", token=token, did=did, params=params)
+
+
+@mcp.tool()
+async def rsp_post_entities_query_v1(
+    query_json: str,
+    token: str = "",
+    did: str = "",
+) -> dict:
+    """Spatial entity POST query via RSP v1 (POST /ngsi-ld/v1/entityOperations/query).
+
+    Accepts a JSON body with entity IDs, geo filter, and attribute query.
+    Equivalent to rsp_get_entities_v1 but supports larger or more complex payloads.
+
+    Args:
+        query_json: JSON body string. Example:
+            {
+              "entities": [{"id": "<resource-uuid>"}],
+              "geoQ": {
+                "georel": "within",
+                "geometry": "Polygon",
+                "coordinates": [[[77.0,12.0],[78.0,12.0],[78.0,13.0],[77.0,13.0],[77.0,12.0]]]
+              },
+              "q": "temperature>25",
+              "attrs": "temperature,humidity,observationDateTime"
+            }
+        token: Optional Bearer JWT. Required for SECURE resources.
+        did:   Optional delegation ID header.
+    """
+    body = _parse(query_json, "query_json")
+    return await _rsp_post("/ngsi-ld/v1/entityOperations/query", token=token, did=did, body=body)
+
+
+@mcp.tool()
+async def rsp_post_entities_query_v2(
+    query_json: str,
+    token: str = "",
+    did: str = "",
+    limit: int = 0,
+    offset: int = 0,
+    count: bool = False,
+    format: str = "",
+    order_by: str = "",
+) -> dict:
+    """Spatial entity POST query via RSP v2 (POST /ngsi-ld/v2/entityOperations/query).
+
+    Enhanced POST spatial query supporting field projection (pick/omit in body),
+    pagination, ordering, format selection, and total-count.
+
+    Args:
+        query_json: JSON body string. Example:
+            {
+              "entities": [{"id": "<resource-uuid>"}],
+              "geoQ": {
+                "georel": "near;maxDistance=1000",
+                "geometry": "Point",
+                "coordinates": [77.5946,12.9716]
+              },
+              "q": "AQI>100",
+              "pick": "id,observationDateTime,AQI",
+              "omit": "deviceInfo"
+            }
+        token:    Optional Bearer JWT. Required for SECURE resources.
+        did:      Optional delegation ID header.
+        limit:    Max number of results.
+        offset:   Result offset for pagination.
+        count:    If True, include total count in response.
+        format:   Response format: 'simplified' or 'ngsi-ld'.
+        order_by: Field to sort by, e.g. 'observationDateTime:desc'.
+    """
+    body = _parse(query_json, "query_json")
+    params: dict[str, Any] = {}
+    if limit > 0:
+        params["limit"] = limit
+    if offset > 0:
+        params["offset"] = offset
+    if count:
+        params["count"] = "true"
+    if format:
+        params["format"] = format
+    if order_by:
+        params["orderBy"] = order_by
+    return await _rsp_post(
+        "/ngsi-ld/v2/entityOperations/query",
+        token=token, did=did, params=params or None, body=body,
+    )
+
+
+@mcp.tool()
+async def rsp_post_temporal_query_v1(
+    query_json: str,
+    token: str = "",
+    did: str = "",
+) -> dict:
+    """Temporal entity POST query via RSP v1 (POST /ngsi-ld/v1/temporal/entityOperations/query).
+
+    Accepts a JSON body combining entity IDs, temporal filter, geo filter, and attribute query.
+    Equivalent to rsp_get_temporal_entities_v1 but supports larger payloads.
+    Uses 'time' and 'endtime' field names inside the temporalQ block.
+
+    Args:
+        query_json: JSON body string. Example:
+            {
+              "entities": [{"id": "<resource-uuid>"}],
+              "temporalQ": {
+                "timerel": "between",
+                "time": "2024-01-01T00:00:00Z",
+                "endtime": "2024-01-07T23:59:59Z"
+              },
+              "geoQ": {
+                "georel": "within",
+                "geometry": "Polygon",
+                "coordinates": [[[77.0,12.0],[78.0,12.0],[78.0,13.0],[77.0,13.0],[77.0,12.0]]]
+              },
+              "q": "temperature>25",
+              "attrs": "temperature,humidity,observationDateTime"
+            }
+        token: Optional Bearer JWT. Required for SECURE resources.
+        did:   Optional delegation ID header.
+    """
+    body = _parse(query_json, "query_json")
+    return await _rsp_post(
+        "/ngsi-ld/v1/temporal/entityOperations/query", token=token, did=did, body=body
+    )
+
+
+@mcp.tool()
+async def rsp_post_temporal_query_v2(
+    query_json: str,
+    token: str = "",
+    did: str = "",
+    limit: int = 0,
+    offset: int = 0,
+    count: bool = False,
+    format: str = "",
+    order_by: str = "",
+) -> dict:
+    """Temporal entity POST query via RSP v2 (POST /ngsi-ld/v2/temporal/entityOperations/query).
+
+    Enhanced POST temporal query supporting field projection (pick/omit in body),
+    custom time property, pagination, ordering, format selection, and total-count.
+    Uses 'timeAt' and 'endTimeAt' inside the temporalQ block.
+
+    Args:
+        query_json: JSON body string. Example:
+            {
+              "entities": [{"id": "<resource-uuid>"}],
+              "temporalQ": {
+                "timerel": "between",
+                "timeAt": "2024-01-01T00:00:00Z",
+                "endTimeAt": "2024-01-07T23:59:59Z",
+                "timeproperty": "observationDateTime"
+              },
+              "geoQ": {
+                "georel": "near;maxDistance=500",
+                "geometry": "Point",
+                "coordinates": [77.5946,12.9716]
+              },
+              "q": "AQI>100",
+              "pick": "id,observationDateTime,AQI,location"
+            }
+        token:    Optional Bearer JWT. Required for SECURE resources.
+        did:      Optional delegation ID header.
+        limit:    Max number of results.
+        offset:   Result offset for pagination.
+        count:    If True, include total count in response.
+        format:   Response format: 'simplified' or 'ngsi-ld'.
+        order_by: Field to sort by, e.g. 'observationDateTime:desc'.
+    """
+    body = _parse(query_json, "query_json")
+    params: dict[str, Any] = {}
+    if limit > 0:
+        params["limit"] = limit
+    if offset > 0:
+        params["offset"] = offset
+    if count:
+        params["count"] = "true"
+    if format:
+        params["format"] = format
+    if order_by:
+        params["orderBy"] = order_by
+    return await _rsp_post(
+        "/ngsi-ld/v2/temporal/entityOperations/query",
+        token=token, did=did, params=params or None, body=body,
+    )
+
+
 # ===========================================================================
 # RESOURCES — public, cacheable, URI-addressable
 # ===========================================================================
@@ -1772,6 +2265,32 @@ async def resource_leaderboard_orgs() -> str:
         return "No leaderboard data."
     lines = [f"{i+1}. {r}" for i, r in enumerate(results)]
     return "IUDX Organisation Leaderboard:\n" + "\n".join(lines)
+
+
+@mcp.resource("iudx://rsp/entities/{id}")
+async def resource_rsp_entities(id: str) -> str:
+    """Latest spatial snapshot for an IUDX resource via the Resource Server Proxy (RSP v2).
+
+    Fetches the most recent entity data for the given resource ID through the RSP,
+    returning a JSON summary. Requires a public/OPEN resource; SECURE resources
+    need a Bearer token (use rsp_get_entities_v2 directly for authenticated access).
+    """
+    try:
+        data = await _rsp_get("/ngsi-ld/v2/entities", params={"id": id, "limit": 10})
+    except httpx.HTTPStatusError as exc:
+        if exc.response.status_code in (401, 403):
+            return f"Resource '{id}' requires authentication. Use rsp_get_entities_v2 with a token."
+        if exc.response.status_code == 404:
+            return f"Resource '{id}' not found via RSP."
+        raise
+    results = data.get("result", data) if isinstance(data, dict) else data
+    if not results:
+        return f"No data found for resource '{id}' via RSP."
+    total = data.get("totalHits", len(results)) if isinstance(data, dict) else len(results)
+    return (
+        f"RSP entity data for '{id}' ({len(results) if isinstance(results, list) else 1} of {total}):\n"
+        + json.dumps(results, indent=2)[:3000]
+    )
 
 
 # ===========================================================================
@@ -2031,6 +2550,83 @@ def ingest_resource_data(resource_id: str) -> str:
     )
 
 
+# ---------------------------------------------------------------------------
+# Resource Server Proxy (RSP) prompts
+# ---------------------------------------------------------------------------
+
+@mcp.prompt()
+def rsp_query_spatial_data(
+    resource_id: str,
+    georel: str = "within",
+    geometry: str = "Polygon",
+    coordinates: str = "",
+) -> str:
+    """Guide the user through a spatial query via the Resource Server Proxy (RSP).
+
+    Args:
+        resource_id:  IUDX resource UUID to query.
+        georel:       Geo-relationship: within, near, intersects, contains, etc.
+        geometry:     Geometry type: Polygon, Point, LineString, etc.
+        coordinates:  GeoJSON coordinates string for the spatial filter.
+    """
+    geo_hint = (
+        f" Apply a spatial filter: georel='{georel}', geometry='{geometry}'"
+        + (f", coordinates='{coordinates}'" if coordinates else " (ask the user for coordinates).")
+    )
+    return (
+        f"Help the user query spatial data for IUDX resource '{resource_id}' via the RSP.\n\n"
+        "Steps:\n"
+        "1. If the user doesn't have a token and the resource is SECURE, advise them to call "
+        "get_token first.\n"
+        f"2. Call rsp_get_entities_v2 with resource_id='{resource_id}'.{geo_hint}\n"
+        "3. If the query body is complex (large polygon, multiple entity IDs, attribute filter), "
+        "switch to rsp_post_entities_query_v2 instead.\n"
+        "4. Summarise the returned entities: count, key attributes (e.g. temperature, AQI), "
+        "and their geographic distribution.\n"
+        "5. Ask if the user wants to refine the search (change radius, add attribute filter with q=, "
+        "or project specific fields with pick=)."
+    )
+
+
+@mcp.prompt()
+def rsp_query_temporal_data(
+    resource_id: str,
+    timerel: str = "between",
+    time_at: str = "",
+    end_time_at: str = "",
+) -> str:
+    """Guide the user through a temporal query via the Resource Server Proxy (RSP).
+
+    Args:
+        resource_id: IUDX resource UUID to query.
+        timerel:     Temporal relationship: between, before, or after.
+        time_at:     ISO-8601 anchor timestamp (start of range for 'between').
+        end_time_at: ISO-8601 end timestamp. Required when timerel='between'.
+    """
+    time_hint = ""
+    if time_at:
+        time_hint = f" Use timeAt='{time_at}'"
+        if end_time_at:
+            time_hint += f" and endTimeAt='{end_time_at}'"
+        time_hint += "."
+    else:
+        time_hint = " Ask the user for the time range (start and end ISO-8601 timestamps)."
+
+    return (
+        f"Help the user query time-series data for IUDX resource '{resource_id}' via the RSP.\n\n"
+        "Steps:\n"
+        "1. If the user doesn't have a token and the resource is SECURE, advise them to call "
+        "get_token first.\n"
+        f"2. Call rsp_get_temporal_entities_v2 with resource_id='{resource_id}', "
+        f"timerel='{timerel}'.{time_hint}\n"
+        "3. If the user also needs spatial filtering (e.g. near a city), combine both filters "
+        "using rsp_post_temporal_query_v2 with a temporalQ + geoQ body.\n"
+        "4. Summarise the returned records: count, time span covered, and key measured properties.\n"
+        "5. Ask if the user wants to narrow the time window, add an attribute filter (q=), "
+        "or change the sort order (orderBy=observationDateTime:asc)."
+    )
+
+
 # ===========================================================================
 # Entry point
 # ===========================================================================
@@ -2040,8 +2636,8 @@ def main() -> None:
     host = os.getenv("MCP_HOST", "0.0.0.0")
     port = int(os.getenv("MCP_PORT", "8000"))
     logger.info(
-        "Starting IUDX MCP Server — transport=%s base_url=%s rs_base_url=%s",
-        transport, BASE_URL, RS_BASE_URL,
+        "Starting IUDX MCP Server — transport=%s base_url=%s rs_base_url=%s rsp_base_url=%s",
+        transport, BASE_URL, RS_BASE_URL, RSP_BASE_URL,
     )
     if transport in ("sse", "streamable-http"):
         mcp.settings.host = host
