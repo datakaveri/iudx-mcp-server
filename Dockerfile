@@ -16,6 +16,7 @@ ENV MCP_PORT=8000
 ENV IUDX_BASE_URL=https://v2.dev.controlplane.iudx.io
 ENV RS_BASE_URL=https://v2.dev.rs.iudx.io
 ENV RSP_BASE_URL=https://v2.dev.rs.iudx.io/rsp
+ENV FILES_BASE_URL=https://v2.dev.file-s3.iudx.io/v1
 
 EXPOSE 8000
 
