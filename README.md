@@ -1,6 +1,6 @@
 # IUDX MCP Server
 
-A [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server for the [Intelligent Universal Data Exchange (IUDX)](https://dataforpublicgood.org.in/technology/) platform. It exposes the full IUDX **Control Plane**, **Resource Server**, and **Resource Server Proxy** APIs as **75 Tools**, **8 Resources** (+ 1 resource template), and **13 Prompts**, enabling AI assistants (Claude Desktop, Claude Code, and any MCP-compatible client) to discover, access, query, and ingest IUDX datasets, AI models, organisations, and subscriptions through natural language.
+A [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server for the [Intelligent Universal Data Exchange (IUDX)](https://dataforpublicgood.org.in/technology/) platform. It exposes the full IUDX **Control Plane**, **Resource Server**, **Resource Server Proxy**, and **Files Connect** APIs as **92 Tools**, **8 Resources** (+ 1 resource template), and **13 Prompts**, enabling AI assistants (Claude Desktop, Claude Code, and any MCP-compatible client) to discover, access, query, ingest, and manage files in IUDX datasets, AI models, organisations, and subscriptions through natural language.
 
 ---
 
@@ -38,6 +38,12 @@ A [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server for the
   - [Resource Server — Data Ingestion](#resource-server--data-ingestion)
   - [Resource Server Proxy — Spatial Query](#resource-server-proxy--spatial-query)
   - [Resource Server Proxy — Temporal Query](#resource-server-proxy--temporal-query)
+  - [Files Connect — Health](#files-connect--health)
+  - [Files Connect — Databank Files](#files-connect--databank-files)
+  - [Files Connect — Multipart Uploads](#files-connect--multipart-uploads)
+  - [Files Connect — Assets](#files-connect--assets)
+  - [Files Connect — Databank Access & Downloads](#files-connect--databank-access--downloads)
+  - [Files Connect — Processing Jobs](#files-connect--processing-jobs)
 - [Resources Reference](#resources-reference)
 - [Prompts Reference](#prompts-reference)
 - [Usage Examples](#usage-examples)
@@ -198,6 +204,7 @@ docker run -p 8000:8000 \
   -e IUDX_BASE_URL=https://v2.prod.controlplane.iudx.io \
   -e RS_BASE_URL=https://v2.prod.rs.iudx.io \
   -e RSP_BASE_URL=https://v2.prod.rs.iudx.io/rsp \
+  -e FILES_BASE_URL=https://v2.dev.file-s3.iudx.io/v1/ \
   iudx-mcp-server
 
 # Run in stdio mode (for use as a Docker-based MCP client command)
@@ -249,6 +256,7 @@ All variables can be set in the shell, a `.env` file next to `docker-compose.yml
 | `IUDX_BASE_URL` | `https://v2.dev.controlplane.iudx.io` | IUDX Control Plane base URL |
 | `RS_BASE_URL` | `https://v2.dev.rs.iudx.io` | IUDX Resource Server base URL |
 | `RSP_BASE_URL` | `https://v2.dev.rs.iudx.io/rsp` | IUDX Resource Server Proxy base URL |
+| `FILES_BASE_URL` | `https://v2.dev.file-s3.iudx.io/v1` | Files Connect API base URL |
 
 **Example `.env` file:**
 
@@ -256,6 +264,7 @@ All variables can be set in the shell, a `.env` file next to `docker-compose.yml
 IUDX_BASE_URL=https://v2.prod.controlplane.iudx.io
 RS_BASE_URL=https://v2.prod.rs.iudx.io
 RSP_BASE_URL=https://v2.prod.rs.iudx.io/rsp
+FILES_BASE_URL=https://v2.dev.file-s3.iudx.io/v1/
 MCP_PORT=9000
 ```
 
@@ -629,6 +638,88 @@ These tools call the **IUDX Resource Server Proxy** (`RSP_BASE_URL`) which route
 
 ---
 
+### Files Connect — Health
+
+| Tool | HTTP | Auth | Description |
+|---|---|---|---|
+| `files_health` | `GET /v1/health` | None | Check if the Files Connect API is running |
+
+---
+
+### Files Connect — Databank Files
+
+| Tool | HTTP | Role | Description |
+|---|---|---|---|
+| `list_databank_files` | `POST /v1/databanks/{id}/files` | provider, consumer | List files and directories in a databank; supports prefix, delimiter, maxKeys, and recursive listing |
+| `download_databank_file` | `POST /v1/databanks/{id}/files/download` | provider, consumer | Download a file or get a presigned URL for it |
+| `get_databank_file_metadata` | `POST /v1/databanks/{id}/files/metadata` | None (public) | Get size, content type, ETag, and last-modified metadata for a file |
+| `delete_databank_file` | `POST /v1/databanks/{id}/files/delete` | provider, consumer (owner) | Delete a file by S3 object key |
+| `preview_databank_file` | `POST /v1/databanks/{id}/files/preview` | provider, consumer | Return the first N lines of a file for quick inspection |
+
+---
+
+### Files Connect — Multipart Uploads
+
+| Tool | HTTP | Role | Description |
+|---|---|---|---|
+| `initiate_databank_upload` | `POST /v1/databanks/{id}/uploads` | provider | Start a multipart upload; returns presigned URLs for each part. Allowed types: CSV, JSON, TXT, Parquet, XLSX, ZIP |
+| `complete_databank_upload` | `PUT /v1/databanks/{id}/uploads/{uploadId}` | provider | Finalise a multipart upload by supplying the completed part list |
+| `cancel_databank_upload` | `POST /v1/databanks/{id}/uploads/{uploadId}/cancel` | provider | Abort an in-progress upload and discard all uploaded parts |
+
+---
+
+### Files Connect — Assets
+
+| Tool | HTTP | Role | Description |
+|---|---|---|---|
+| `upload_asset` | `POST /v1/assets` | provider, consumer, cos_admin | Upload a PDF or image file (JPEG, PNG, GIF, WebP, SVG, TIFF, BMP) from a local path |
+| `download_asset` | `POST /v1/assets/download` | provider, cos_admin | Get a presigned URL for downloading a previously uploaded asset |
+
+---
+
+### Files Connect — Databank Access & Downloads
+
+| Tool | HTTP | Role | Description |
+|---|---|---|---|
+| `get_databank_query_access` | `GET /v1/databanks/{id}/query-access` | provider, consumer | Get short-lived AWS STS credentials for direct S3 access (usable with DuckDB, Athena, etc.) |
+| `get_databank_download_url` | `GET /v1/databanks/{id}/download` | provider, consumer | Get a presigned URL for downloading the entire databank as a zip archive |
+| `get_databank_report_download_url` | `GET /v1/databanks/{id}/report/download` | None (public) | Get a presigned URL for the data readiness report PDF |
+
+---
+
+### Files Connect — Processing Jobs
+
+| Tool | HTTP | Role | Description |
+|---|---|---|---|
+| `create_databank_process_job` | `POST /v1/databanks/{id}/process` | provider | Queue a processing job: `zip` (archive), `report` (data readiness assessment), or `all` (both) |
+| `get_databank_process_job` | `GET /v1/databanks/{id}/process/{jobId}` | provider | Poll job status (`pending` → `processing` → `completed` \| `failed`) and retrieve results |
+| `update_databank_process_job_status` | `PUT /v1/databanks/{id}/process/{jobId}/status` | provider | Update job status and progress (used by worker processes) |
+
+<details>
+<summary><code>create_databank_process_job</code> — job type reference</summary>
+
+| `job_type` | Description | Response shape |
+|---|---|---|
+| `zip` | Creates a compressed zip archive of all databank files | Single `jobId` |
+| `report` | Runs data readiness assessment (structured or unstructured auto-detection); uploads PDF to `{databankId}/data_readiness_report.pdf` in the reports bucket | Single `jobId` |
+| `all` | Runs both zip and report in parallel | `jobIds.zip` and `jobIds.report` — poll each separately |
+
+**Completed report job `result` fields:**
+
+| Field | Description |
+|---|---|
+| `data_type` | `structured` or `unstructured` |
+| `files_processed` | Number of files analysed |
+| `reports_uploaded` | Number of report files written |
+| `processing_time_seconds` | Total wall-clock time |
+| `download_time_seconds` | Time downloading source files |
+| `framework_time_seconds` | Time running the assessment framework |
+| `upload_time_seconds` | Time uploading report outputs |
+
+</details>
+
+---
+
 ## Resources Reference
 
 Resources are **read-only, URI-addressable** data sources backed by public IUDX endpoints. They provide ambient context to an LLM without requiring tool calls.
@@ -933,6 +1024,86 @@ rs_ingest_entities_publish(
 )
 ```
 
+### List files in a databank
+
+```python
+list_databank_files(
+    databank_id="my-databank-id",
+    token="<bearer-jwt>",
+    prefix="2024/",
+    recursive=True,
+)
+```
+
+### Preview a CSV file
+
+```python
+preview_databank_file(
+    databank_id="my-databank-id",
+    key="2024/data.csv",
+    token="<bearer-jwt>",
+    max_lines=20,
+)
+```
+
+### Upload a file using multipart upload
+
+```python
+# 1. Initiate — get presigned URLs for each part
+initiate_databank_upload(
+    databank_id="my-databank-id",
+    key="datasets/large_file.csv",
+    num_parts=3,
+    token="<bearer-jwt>",
+    content_type="text/csv",
+)
+# → returns uploadId and presignedUrl for each part
+
+# 2. Upload each part directly to the presigned URLs (outside MCP)
+
+# 3. Complete
+complete_databank_upload(
+    databank_id="my-databank-id",
+    upload_id="<uploadId from step 1>",
+    key="datasets/large_file.csv",
+    parts_json='[{"partNumber": 1, "etag": "abc"}, {"partNumber": 2, "etag": "def"}, {"partNumber": 3, "etag": "ghi"}]',
+    token="<bearer-jwt>",
+)
+```
+
+### Run a data readiness report and download the PDF
+
+```python
+# 1. Queue the job
+create_databank_process_job(
+    databank_id="my-databank-id",
+    job_type="report",
+    token="<bearer-jwt>",
+)
+# → returns jobId
+
+# 2. Poll until completed
+get_databank_process_job(
+    databank_id="my-databank-id",
+    job_id="<jobId from step 1>",
+    token="<bearer-jwt>",
+)
+
+# 3. Download the PDF (public — no token needed)
+get_databank_report_download_url(databank_id="my-databank-id")
+# → returns presigned downloadUrl
+```
+
+### Get temporary S3 credentials for DuckDB access
+
+```python
+get_databank_query_access(
+    databank_id="my-databank-id",
+    token="<bearer-jwt>",
+)
+# → returns accessKeyId, secretAccessKey, sessionToken, expiration, and s3Config
+```
+
 ### Spatial query via the Resource Server Proxy (RSP v2)
 
 ```python
@@ -1031,9 +1202,9 @@ Expected output:
 Transport: stdio  (spawning server.py)
 
 ──────────────────────────────────────────────────────────
-  Available tools (75 total)
+  Available tools (92 total)
 ──────────────────────────────────────────────────────────
-["search_catalogue", "get_cat_item", ..., "rsp_post_temporal_query_v2"]
+["search_catalogue", "get_cat_item", ..., "update_databank_process_job_status"]
 
 ──────────────────────────────────────────────────────────
   count_catalogue_entities
@@ -1125,7 +1296,7 @@ iudx-mcp-server/
 ### Key design decisions
 
 - **Configurable transport** — `MCP_TRANSPORT=stdio` for local / embedded use; `sse` or `streamable-http` for networked / Docker deployments. Controlled entirely by environment variable, no code change needed.
-- **Three base URLs** — `IUDX_BASE_URL` for the Control Plane (catalogue, auth, orgs), `RS_BASE_URL` for the Resource Server (time-series query and ingestion), and `RSP_BASE_URL` for the Resource Server Proxy (NGSI-LD v1/v2 spatial and temporal search via the IUDX data plane proxy). Each can be pointed independently at dev, staging, or production.
+- **Four base URLs** — `IUDX_BASE_URL` for the Control Plane (catalogue, auth, orgs), `RS_BASE_URL` for the Resource Server (time-series query and ingestion), `RSP_BASE_URL` for the Resource Server Proxy (NGSI-LD v1/v2 spatial and temporal search via the IUDX data plane proxy), and `FILES_BASE_URL` for the Files Connect API (file storage, multipart uploads, asset management, and processing jobs). Each can be pointed independently at dev, staging, or production.
 - **`json.loads` for complex payloads** — IUDX item bodies and RS query objects are large, schema-variable JSON objects. Accepting them as raw JSON strings (parsed internally with `_parse()`) avoids an explosion of keyword parameters and works for all current and future IUDX entity types.
 - **Token as a parameter** — Every authenticated tool accepts an explicit `token: str` argument rather than reading from environment variables, keeping the server stateless and easy to test.
 - **Resources are public only** — Resources are URI-addressable and cacheable; only unauthenticated public endpoints are exposed as resources. Auth-gated data is exposed exclusively through tools.
@@ -1140,3 +1311,4 @@ iudx-mcp-server/
 | Control Plane | `https://v2.dev.controlplane.iudx.io/apis` |
 | Resource Server | `https://v2.dev.rs.iudx.io/apis` |
 | Resource Server Proxy | `https://v2.dev.rs.iudx.io/rsp/apis` |
+| Files Connect | `https://v2.dev.file-s3.iudx.io/apis` |
