@@ -11,18 +11,17 @@ services:
       MCP_TRANSPORT: ${MCP_TRANSPORT:-sse}
       MCP_HOST: "0.0.0.0"
       MCP_PORT: "8000"
-      IUDX_BASE_URL: ${IUDX_BASE_URL:-https://v2.dev.controlplane.iudx.io}
-      RS_BASE_URL: ${RS_BASE_URL:-https://v2.dev.rs.iudx.io}
-      RSP_BASE_URL: ${RSP_BASE_URL:-https://v2.dev.rs.iudx.io/rsp}
-      FILES_BASE_URL: ${FILES_BASE_URL:-https://v2.dev.file-s3.iudx.io/v1}
+      IUDX_BASE_URL: ${IUDX_BASE_URL:-https://mahaagx.maharashtra.gov.in/controlplane/}
+      RS_BASE_URL: ${RS_BASE_URL:-https://mahaagx.maharashtra.gov.in/dataplane/}
+      RSP_BASE_URL: ${RSP_BASE_URL:-https://mahaagx.maharashtra.gov.in/dataplane/rsp/}
+      FILES_BASE_URL: ${FILES_BASE_URL:-https://mahaagx.maharashtra.gov.in/files-connect-api/v1/}
+      ES_INDEX_PREFIX: ${ES_INDEX_PREFIX:-}
     restart: unless-stopped
     healthcheck:
-      test: >
-        python -c "
-        import urllib.request, sys;
-        urllib.request.urlopen('http://localhost:8000/sse', timeout=4);
-        sys.exit(0)
-        " 2>/dev/null || exit 1
+      test: >-
+        python -c
+        "import http.client, sys; c=http.client.HTTPConnection('localhost',8000,timeout=4);
+        c.request('GET','/sse'); r=c.getresponse(); sys.exit(0 if r.status==200 else 1)"
       interval: 30s
       timeout: 5s
       start_period: 15s

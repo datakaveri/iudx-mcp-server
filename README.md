@@ -257,6 +257,7 @@ All variables can be set in the shell, a `.env` file next to `docker-compose.yml
 | `RS_BASE_URL` | `https://v2.dev.rs.iudx.io` | IUDX Resource Server base URL |
 | `RSP_BASE_URL` | `https://v2.dev.rs.iudx.io/rsp` | IUDX Resource Server Proxy base URL |
 | `FILES_BASE_URL` | `https://v2.dev.file-s3.iudx.io/v1` | Files Connect API base URL |
+| `ES_INDEX_PREFIX` | _(empty)_ | Prefix prepended to all Elasticsearch index names (e.g. `dev-`, `iudx-`) |
 
 **Example `.env` file:**
 
@@ -1300,6 +1301,7 @@ iudx-mcp-server/
 - **`json.loads` for complex payloads** — IUDX item bodies and RS query objects are large, schema-variable JSON objects. Accepting them as raw JSON strings (parsed internally with `_parse()`) avoids an explosion of keyword parameters and works for all current and future IUDX entity types.
 - **Token as a parameter** — Every authenticated tool accepts an explicit `token: str` argument rather than reading from environment variables, keeping the server stateless and easy to test.
 - **Resources are public only** — Resources are URI-addressable and cacheable; only unauthenticated public endpoints are exposed as resources. Auth-gated data is exposed exclusively through tools.
+- **ES index prefix** — `ES_INDEX_PREFIX` is automatically prepended to the Elasticsearch index `id` in `rs_create_elasticsearch_index`, allowing the same tool calls to target environment-specific indices (e.g. `dev-`, `staging-`, `iudx-`) without changing the payload.
 - **CSV helpers** — RS download endpoints return `text/csv` instead of JSON. Dedicated `_rs_get_text` / `_rs_post_text` helpers handle these and return raw CSV strings with a 120-second timeout.
 
 ---
