@@ -1,6 +1,6 @@
 # IUDX MCP Server
 
-A [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server for the [Intelligent Universal Data Exchange (IUDX)](https://dataforpublicgood.org.in/technology/) platform. It exposes the full IUDX **Control Plane**, **Resource Server**, **Resource Server Proxy**, and **Files Connect** APIs as **92 Tools**, **8 Resources** (+ 1 resource template), and **13 Prompts**, enabling AI assistants (Claude Desktop, Claude Code, and any MCP-compatible client) to discover, access, query, ingest, and manage files in IUDX datasets, AI models, organisations, and subscriptions through natural language.
+A [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server for the [Intelligent Universal Data Exchange (IUDX)](https://dataforpublicgood.org.in/technology/) platform. It exposes the full IUDX **Control Plane**, **Resource Server**, **Resource Server Proxy**, **Files Connect**, and **Sandbox Connect** APIs as **115 Tools**, **8 Resources** (+ 1 resource template), and **13 Prompts**, enabling AI assistants (Claude Desktop, Claude Code, and any MCP-compatible client) to discover, access, query, ingest, manage files, and run sandbox notebooks in IUDX datasets, AI models, organisations, and subscriptions through natural language.
 
 ---
 
@@ -44,6 +44,11 @@ A [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server for the
   - [Files Connect — Assets](#files-connect--assets)
   - [Files Connect — Databank Access & Downloads](#files-connect--databank-access--downloads)
   - [Files Connect — Processing Jobs](#files-connect--processing-jobs)
+  - [Sandbox Connect — Bookings](#sandbox-connect--bookings)
+  - [Sandbox Connect — Categories & Slots](#sandbox-connect--categories--slots)
+  - [Sandbox Connect — Direct Notebooks](#sandbox-connect--direct-notebooks)
+  - [Sandbox Connect — Token Sessions](#sandbox-connect--token-sessions)
+  - [Sandbox Connect — JupyterLite & Profile](#sandbox-connect--jupyterlite--profile)
 - [Resources Reference](#resources-reference)
 - [Prompts Reference](#prompts-reference)
 - [Usage Examples](#usage-examples)
@@ -205,6 +210,7 @@ docker run -p 8000:8000 \
   -e RS_BASE_URL=https://v2.prod.rs.iudx.io \
   -e RSP_BASE_URL=https://v2.prod.rs.iudx.io/rsp \
   -e FILES_BASE_URL=https://v2.dev.file-s3.iudx.io/v1/ \
+  -e SANDBOX_BASE_URL=https://v2.dev.sandbox.iudx.io \
   iudx-mcp-server
 
 # Run in stdio mode (for use as a Docker-based MCP client command)
@@ -257,6 +263,7 @@ All variables can be set in the shell, a `.env` file next to `docker-compose.yml
 | `RS_BASE_URL` | `https://v2.dev.rs.iudx.io` | IUDX Resource Server base URL |
 | `RSP_BASE_URL` | `https://v2.dev.rs.iudx.io/rsp` | IUDX Resource Server Proxy base URL |
 | `FILES_BASE_URL` | `https://v2.dev.file-s3.iudx.io/v1` | Files Connect API base URL |
+| `SANDBOX_BASE_URL` | `https://v2.dev.sandbox.iudx.io` | Sandbox Connect API base URL (notebooks & bookings) |
 | `ES_INDEX_PREFIX` | _(empty)_ | Prefix prepended to all Elasticsearch index names (e.g. `dev-`, `iudx-`) |
 
 **Example `.env` file:**
@@ -266,6 +273,7 @@ IUDX_BASE_URL=https://v2.prod.controlplane.iudx.io
 RS_BASE_URL=https://v2.prod.rs.iudx.io
 RSP_BASE_URL=https://v2.prod.rs.iudx.io/rsp
 FILES_BASE_URL=https://v2.dev.file-s3.iudx.io/v1/
+SANDBOX_BASE_URL=https://v2.dev.sandbox.iudx.io
 MCP_PORT=9000
 ```
 
@@ -469,8 +477,8 @@ Require `cos_admin` or `org_admin` role.
 | Tool | HTTP | Description |
 |---|---|---|
 | `get_credit_balance` | `GET /iudx/v2/auth/user/credit/balance` | Get own credit balance |
-| `request_credits` | `POST /iudx/v2/auth/user/credit/request` | Submit a credit top-up request |
-| `get_credit_request` | `GET /iudx/v2/auth/user/credit/request/{id}` | Fetch a specific credit request |
+| `request_credits` | `POST /iudx/v2/auth/credit/request` | Submit a credit top-up request |
+| `list_my_credit_requests` | `GET /iudx/v2/auth/user/credit/request` | List own credit requests |
 | `admin_list_credit_requests` | `GET /iudx/v2/auth/credit/request` | Admin: list all credit requests |
 
 ---
@@ -523,7 +531,6 @@ All public — no authentication required.
 |---|---|---|
 | `list_asset_access_requests` | `GET /iudx/v2/auth/asset/request` | List own access requests |
 | `create_asset_access_request` | `POST /iudx/v2/auth/asset/request` | Submit a new access request |
-| `get_asset_access_request` | `GET /iudx/v2/auth/asset/request/{id}` | Fetch a request by ID |
 | `update_asset_access_request` | `PUT /iudx/v2/auth/asset/request/{id}` | Update a request |
 | `delete_asset_access_request` | `DELETE /iudx/v2/auth/asset/request/{id}` | Delete / cancel a request |
 
@@ -534,8 +541,118 @@ All public — no authentication required.
 | Tool | HTTP | Role | Description |
 |---|---|---|---|
 | `list_my_compute_requests` | `GET /iudx/v2/auth/user/compute/requests` | any | List own compute requests |
-| `get_compute_request` | `GET /iudx/v2/auth/user/compute/requests/{id}` | any | Fetch a compute request by ID |
 | `admin_list_compute_requests` | `GET /iudx/v2/auth/compute/requests` | `cos_admin` | List all platform compute requests |
+
+---
+
+### Control Plane — Additional Endpoints
+
+Apps & tokens, delegation, feedback & interactions, KYC, organisation/user management, provider requests, asset sharing, custom roles, ACL servers, request conversations, CSV reports (`tools/controlplane_extra.py`).
+
+| Tool | HTTP | Description |
+|---|---|---|
+| `create_app` | `POST /iudx/v2/auth/app` | Create an app (client credentials for an app) with delegated roles |
+| `list_apps` | `GET /iudx/v2/auth/app` | List the authenticated user's apps |
+| `delete_app` | `DELETE /iudx/v2/auth/app/{appId}` | Delete an app |
+| `update_app_status` | `PATCH /iudx/v2/auth/app/{appId}` | Update an app's status |
+| `get_jwks` | `GET /iudx/v2/auth/jwks` | Fetch the platform JSON Web Key Set (public keys for validating tokens) |
+| `get_app_token` | `POST /iudx/auth/v2/app/token` | Obtain a token for an app using its appId/appSecret (optionally scoped to an item) |
+| `create_client_credentials` | `POST /iudx/v2/auth/client` | Create a new clientId/clientSecret pair for the authenticated user |
+| `download_admin_activity_report` | `GET /iudx/v2/auditing/reportactivity/admin` | Download the admin activity report as CSV |
+| `download_consumer_activity_report` | `GET /iudx/v2/auditing/reportactivity/consumer` | Download the consumer activity report as CSV |
+| `patch_cat_item` | `PATCH /iudx/v2/cat/item` | Partially update a catalogue item |
+| `download_item_script` | `GET /items/scripts/download/{filename}` | Download a catalogue item's Python script |
+| `check_item_name_available` | `GET /iudx/v2/cat/item/available-name` | Check whether a catalogue item name is available |
+| `create_compute_request` | `POST /iudx/v2/auth/compute/requests` | Request compute-role access |
+| `update_compute_request` | `PUT /iudx/v2/auth/compute/requests/{id}` | Grant or reject a compute request (admin) |
+| `delete_compute_request` | `DELETE /iudx/v2/auth/user/compute/requests/{id}` | Delete / cancel one of your own compute requests |
+| `download_compute_requests_report` | `GET /iudx/v2/auth/compute/requests/report` | Admin: download compute requests report as CSV |
+| `admin_get_user_credit_balance` | `GET /iudx/v2/auth/admin/user/credit/balance/{id}` | Admin: fetch a user's credit balance |
+| `delete_credit_request` | `DELETE /iudx/v2/auth/user/credit/request/{id}` | Delete / cancel one of your own credit requests |
+| `admin_handle_credit_request` | `PUT /iudx/v2/auth/credit/request` | Admin: grant or reject a credit request |
+| `admin_deduct_user_credits` | `PUT /iudx/v2/auth/admin/user/credit/deduct` | Admin: deduct credits from a user |
+| `admin_add_user_credits` | `PUT /iudx/v2/auth/admin/user/credit/add` | Admin: add credits to a user |
+| `download_credit_requests_report` | `GET /iudx/v2/auth/credit/request/report` | Admin: download credit requests report as CSV |
+| `create_delegation` | `POST /iudx/v2/auth/delegation` | Grant a delegation to another user |
+| `list_delegations_as_delegate` | `GET /iudx/v2/auth/delegation/delegate` | List delegations granted to you (you are the delegate) |
+| `list_delegations_as_delegator` | `GET /iudx/v2/auth/delegation/delegator` | List delegations you have granted (you are the delegator) |
+| `download_delegations_report` | `GET /iudx/v2/auth/delegation/delegator/report` | Download the delegator delegations report as CSV |
+| `get_delegation` | `GET /iudx/v2/auth/delegation/{id}` | Fetch a delegation grant by ID |
+| `delete_delegation` | `PUT /iudx/v2/auth/delegation/{id}` | Delete a delegation grant (delegator only; marks it DELETED) |
+| `add_delegation_constraints` | `PATCH /iudx/v2/auth/delegation/{id}/constraints` | Add role constraints to a delegation |
+| `remove_delegation_constraints` | `DELETE /iudx/v2/auth/delegation/{id}/constraints` | Remove role constraints from a delegation |
+| `reject_delegation` | `POST /iudx/v2/auth/delegation/{id}/reject` | Reject a delegation granted to you (delegate only) |
+| `create_user_interaction` | `POST /iudx/v2/user/interactions` | Record a user interaction (bookmark / like / dislike) on an asset |
+| `list_user_interactions` | `GET /iudx/v2/user/interactions` | List the user's interactions |
+| `sync_user_interactions` | `GET /iudx/v2/user/interactions/sync` | Sync the user's interactions |
+| `create_user_feedback` | `POST /iudx/v2/user/feedback` | Submit feedback / a rating for an asset |
+| `update_user_feedback` | `PUT /iudx/v2/user/feedback` | Update your feedback / rating for an asset |
+| `delete_user_feedback` | `DELETE /iudx/v2/user/feedback` | Delete your feedback for an asset |
+| `list_approved_feedback` | `GET /iudx/v2/user/feedback/approved` | List approved feedback |
+| `list_platform_feedback` | `GET /iudx/v2/user/feedback/platform` | Admin: list all feedback on the platform |
+| `list_my_feedback` | `GET /iudx/v2/user/feedback/user` | List the authenticated user's feedback |
+| `moderate_user_feedback` | `PUT /iudx/v2/user/feedback/{id}` | Admin: approve / reject a feedback entry |
+| `create_provider_feedback` | `POST /iudx/v2/provider/feedback` | Create provider feedback / FAQ / info for an asset |
+| `update_provider_feedback` | `PUT /iudx/v2/provider/feedback` | Replace provider feedback entries for an asset+type |
+| `list_provider_feedback` | `GET /iudx/v2/provider/feedback` | List provider feedback for an asset |
+| `delete_provider_feedback` | `DELETE /iudx/v2/provider/feedback` | Delete provider feedback for an asset+type |
+| `verify_kyc` | `POST /iudx/v2/auth/kyc/verify` | Verify KYC with an authorisation code |
+| `confirm_kyc` | `GET /iudx/v2/auth/kyc/confirm/{id}` | Confirm a KYC verification by ID |
+| `revoke_kyc` | `POST /iudx/v2/auth/kyc/revoke` | Revoke the authenticated user's KYC |
+| `list_my_org_creation_requests` | `GET /iudx/v2/auth/user/organisations/requests` | List your own organisation creation requests |
+| `delete_my_org_creation_request` | `DELETE /iudx/v2/auth/user/organisations/requests/{id}` | Delete one of your own organisation creation requests |
+| `list_my_org_join_requests` | `GET /iudx/v2/auth/user/organisations/join_requests` | List your own organisation join requests |
+| `delete_my_org_join_request` | `DELETE /iudx/v2/auth/user/organisations/join_requests/{id}` | Delete one of your own organisation join requests |
+| `submit_org_join_request` | `POST /iudx/v2/auth/organisations/{id}/join_requests` | Request to join an organisation |
+| `update_org_join_request_status` | `PATCH /iudx/v2/auth/organisation/join-request/{id}` | Update the status of an organisation join request |
+| `update_organisation` | `PUT /iudx/v2/auth/organisations/{id}` | Update an organisation |
+| `delete_organisation` | `DELETE /iudx/v2/auth/organisations/{id}` | Delete an organisation |
+| `get_org_user` | `GET /iudx/v2/auth/organisations/{id}/users/{user_id}` | Fetch a user within an organisation |
+| `update_org_user_role` | `PUT /iudx/v2/auth/organisations/{id}/users/{user_id}` | Change a user's role within an organisation |
+| `remove_org_user` | `DELETE /iudx/v2/auth/organisations/{id}/users/{user_id}` | Remove a user from an organisation |
+| `list_org_provider_requests` | `GET /iudx/v2/auth/organization/user/provider_requests` | List organisation provider requests |
+| `delete_org_provider_request` | `DELETE /iudx/v2/auth/organization/user/provider-requests/{id}` | Delete an organisation provider request |
+| `create_org_provider_role_request` | `POST /iudx/v2/auth/organization/user/provider_role/requests` | Request the provider role within your organisation |
+| `list_org_provider_role_requests` | `GET /iudx/v2/auth/organization/user/provider_role/requests` | List organisation provider-role requests |
+| `update_org_provider_role_request` | `PUT /iudx/v2/auth/organization/user/provider_role/requests/{id}` | Grant or reject a provider-role request |
+| `add_org_provider` | `POST /iudx/v2/auth/organization/user/provider` | Make a user a provider in an organisation |
+| `download_org_creation_requests_report` | `GET /iudx/v2/auth/organisations/requests/report` | Download organisation creation requests report as CSV |
+| `download_organisations_report` | `GET /iudx/v2/auth/organisations/report` | Download organisations report as CSV |
+| `download_org_join_requests_report` | `GET /iudx/v2/auth/organisations/{id}/join_requests/report` | Download an organisation's join requests report as CSV |
+| `download_provider_role_requests_report` | `GET /iudx/v2/auth/organization/user/provider_role/requests/report` | Download provider-role requests report as CSV |
+| `create_platform_provider_request` | `POST /iudx/v2/auth/user/platform/provider-requests` | Request the platform provider role |
+| `get_my_platform_provider_request` | `GET /iudx/v2/auth/user/platform/provider-requests` | Fetch your platform provider request |
+| `delete_my_platform_provider_request` | `DELETE /iudx/v2/auth/user/platform/provider-requests` | Delete your platform provider request |
+| `admin_list_platform_provider_requests` | `GET /iudx/v2/auth/admin/platform/provider-requests` | Admin: list platform provider requests |
+| `admin_update_platform_provider_request` | `PATCH /iudx/v2/auth/admin/platform/provider-requests/{id}` | Admin: grant / reject a platform provider request |
+| `share_asset` | `POST /iudx/v2/cat/assets/share` | Share an asset with users / organisations |
+| `unshare_asset` | `DELETE /iudx/v2/cat/assets/share` | Revoke sharing of an asset |
+| `list_asset_shares` | `GET /iudx/v2/cat/assets/share` | List who an asset is shared with |
+| `list_assets_shared_with_me` | `GET /iudx/v2/cat/assets/shared-with-me` | List assets shared with the authenticated user |
+| `request_custom_role` | `POST /iudx/v2/auth/user/custom/role` | Request a custom role / scope for a user |
+| `list_custom_roles` | `GET /iudx/v2/auth/user/custom/role` | List custom role requests |
+| `delete_custom_role` | `DELETE /iudx/v2/auth/user/custom/role` | Delete a custom role grant |
+| `list_custom_role_requesters` | `GET /auth/v2/custom-role/requester` | List custom-role requesters |
+| `change_my_password` | `PUT /iudx/v2/auth/user/password` | Change the authenticated user's password |
+| `list_users_basic` | `GET /iudx/v2/auth/user/basic` | List users (basic details) |
+| `get_user_basic_by_identifier` | `GET /iudx/v2/auth/user/basic/by-identifier` | Look up a user (basic details) by user ID or email |
+| `update_my_account_status` | `POST /iudx/v2/auth/user/update` | Activate / deactivate your own account |
+| `admin_update_user_account_status` | `POST /iudx/v2/auth/admin/{id}/update` | Admin: activate / deactivate a user account |
+| `delete_my_account` | `DELETE /iudx/v2/auth/user/delete` | Delete the authenticated user's account |
+| `create_my_description` | `POST /iudx/v2/auth/user/description/info` | Create the user's profile description |
+| `update_my_description` | `PATCH /iudx/v2/auth/user/description/info` | Update the user's profile description |
+| `get_my_description` | `GET /iudx/v2/auth/user/description/info` | Fetch the user's profile description |
+| `list_acl_servers` | `GET /iudx/v2/acl_servers` | List ACL servers |
+| `create_acl_server` | `POST /iudx/v2/acl_servers` | Register an ACL server |
+| `get_acl_server` | `GET /iudx/v2/acl_servers/{id}` | Fetch an ACL server by ID |
+| `delete_acl_server` | `DELETE /iudx/v2/acl_servers/{id}` | Delete an ACL server by ID |
+| `list_request_conversations` | `GET /iudx/v2/requests/{request_id}/conversations` | List conversation messages on a request |
+| `post_request_message` | `POST /iudx/v2/requests/{request_id}/conversations` | Post a message on a request conversation |
+| `get_request_message` | `GET /iudx/v2/requests/{request_id}/conversations/{msg_id}` | Fetch a conversation message |
+| `update_request_message` | `PUT /iudx/v2/requests/{request_id}/conversations/{msg_id}` | Edit a conversation message |
+| `delete_request_message` | `DELETE /iudx/v2/requests/{request_id}/conversations/{msg_id}` | Delete a conversation message |
+| `reply_to_request_message` | `POST /iudx/v2/requests/{request_id}/conversations/{msg_id}/reply` | Reply to a conversation message |
+| `get_token_with_client_credentials` | `POST /iudx/v2/auth/token` | Issue a JWT using clientId/clientSecret headers |
 
 ---
 
@@ -644,6 +761,7 @@ These tools call the **IUDX Resource Server Proxy** (`RSP_BASE_URL`) which route
 | Tool | HTTP | Auth | Description |
 |---|---|---|---|
 | `files_health` | `GET /v1/health` | None | Check if the Files Connect API is running |
+| `get_files_encryption_public_key` | `GET /v1/encryption/public-key` | None | Fetch the Files Connect encryption public key |
 
 ---
 
@@ -718,6 +836,70 @@ These tools call the **IUDX Resource Server Proxy** (`RSP_BASE_URL`) which route
 | `upload_time_seconds` | Time uploading report outputs |
 
 </details>
+
+---
+
+### Sandbox Connect — Bookings
+
+These tools call the **Sandbox Connect API** (`SANDBOX_BASE_URL`), which manages CPU/GPU Kubeflow notebook sandboxes through slot bookings. Bookings move through lifecycle states: `scheduled` → `ready` → `active` → `shutting_down` → `completed`, with `cancelled` and `expired` as terminal states. Active-capacity limits count `scheduled`, `ready`, `active`, and `shutting_down`; the weekly quota also counts `completed`.
+
+| Tool | HTTP | Description |
+|---|---|---|
+| `list_sandbox_bookings` | `GET /v1/bookings` | List the user's bookings with status filter and pagination; `notebookUrl` is present only for active bookings |
+| `create_sandbox_booking` | `POST /v1/bookings` | Book a CPU/GPU notebook slot (inserted as `scheduled`); supports preloading a file or cloning a git repo |
+| `cancel_sandbox_booking` | `PATCH /v1/bookings/{id}/cancel` | Cancel a `scheduled` booking before resources are provisioned |
+| `extend_sandbox_booking` | `PATCH /v1/bookings/{id}/extend` | Extend an `active` booking to the next contiguous slot (once per booking, capacity permitting) |
+| `terminate_sandbox_booking` | `PATCH /v1/bookings/{id}/terminate` | End a `ready`/`active`/`shutting_down` session early; marks it `completed` and deletes Notebook/PVC |
+| `reset_sandbox_booking` | `PATCH /v1/bookings/{id}/reset` | Reset a stuck booking: `scheduled` → `cancelled`, `ready` → `expired` (with resource cleanup) |
+
+---
+
+### Sandbox Connect — Categories & Slots
+
+| Tool | HTTP | Description |
+|---|---|---|
+| `list_sandbox_categories` | `GET /v1/categories` | List CPU/GPU booking categories with limits, grace periods, and slot templates |
+| `list_available_sandbox_slots` | `GET /v1/slots/available` | Slot-level availability for a category on a date (YYYY-MM-DD, IST) |
+| `get_sandbox_slots_calendar` | `GET /v1/slots/calendar` | Day-level availability totals for a category and month (YYYY-MM) |
+| `list_sandbox_instance_types` | `GET /v1/notebook/instance-types` | Instance types for GPU-backed categories with display metadata |
+
+---
+
+### Sandbox Connect — Direct Notebooks
+
+Direct notebook management is available when the deployment runs with `API_BOOKINGS_ENABLED=false`; notebooks stay live until stopped or deleted.
+
+| Tool | HTTP | Description |
+|---|---|---|
+| `create_sandbox_notebook` | `POST /v1/notebook/create` | Create a CPU/GPU notebook directly, without a booking |
+| `list_sandbox_notebooks` | `GET /v1/notebook/list` | List the user's notebooks with pagination, ordering, and date filtering |
+| `get_sandbox_notebook_status` | `GET /v1/notebook/status/{name}` | Notebook status (`opening`/`running`/`stopped`/`failed`/`orphaned`), resources, events, and linked booking |
+| `check_sandbox_notebook_exists` | `GET /v1/notebook/check-exists/{name}` | Check whether a notebook name is already taken |
+| `start_sandbox_notebook` | `PATCH /v1/notebook/start` | Start a stopped notebook (removes the Kubeflow stopped annotation) |
+| `stop_sandbox_notebook` | `PATCH /v1/notebook/stop` | Stop a running notebook (adds the Kubeflow stopped annotation) |
+| `delete_sandbox_notebook` | `DELETE /v1/notebook/delete` | Delete a notebook and its PVC permanently |
+
+---
+
+### Sandbox Connect — Token Sessions
+
+Token sessions exchange the caller's access token for a notebook-scoped delegated refresh token stored in a Kubernetes Secret; browser refresh tokens are never accepted. The `PUT` rotation routes accept only a delegated notebook-client access token belonging to the owner.
+
+| Tool | HTTP | Description |
+|---|---|---|
+| `create_booking_notebook_token_session` | `POST /v1/bookings/{id}/notebook-token-session` | Create a delegated token session for a booked notebook |
+| `rotate_booking_notebook_token` | `PUT /v1/bookings/{id}/notebook-token-session` | Persist a rotated refresh token for a booked notebook after Keycloak rotation |
+| `create_notebook_token_session` | `POST /v1/notebook/{name}/notebook-token-session` | Create a delegated token session for a direct notebook |
+| `rotate_notebook_token` | `PUT /v1/notebook/{name}/notebook-token-session` | Persist a rotated refresh token for a direct notebook |
+
+---
+
+### Sandbox Connect — JupyterLite & Profile
+
+| Tool | HTTP | Description |
+|---|---|---|
+| `create_jupyterlite_session` | `POST /v1/jupyterlite/session` | Validate the bearer token and set an HttpOnly cookie for browser JupyterLite launches |
+| `create_kubeflow_profile` | `POST /v1/profile/create` | Create the user's Kubeflow Profile CRD (required before notebooks can be provisioned) |
 
 ---
 
@@ -1297,7 +1479,7 @@ iudx-mcp-server/
 ### Key design decisions
 
 - **Configurable transport** — `MCP_TRANSPORT=stdio` for local / embedded use; `sse` or `streamable-http` for networked / Docker deployments. Controlled entirely by environment variable, no code change needed.
-- **Four base URLs** — `IUDX_BASE_URL` for the Control Plane (catalogue, auth, orgs), `RS_BASE_URL` for the Resource Server (time-series query and ingestion), `RSP_BASE_URL` for the Resource Server Proxy (NGSI-LD v1/v2 spatial and temporal search via the IUDX data plane proxy), and `FILES_BASE_URL` for the Files Connect API (file storage, multipart uploads, asset management, and processing jobs). Each can be pointed independently at dev, staging, or production.
+- **Five base URLs** — `IUDX_BASE_URL` for the Control Plane (catalogue, auth, orgs), `RS_BASE_URL` for the Resource Server (time-series query and ingestion), `RSP_BASE_URL` for the Resource Server Proxy (NGSI-LD v1/v2 spatial and temporal search via the IUDX data plane proxy), `FILES_BASE_URL` for the Files Connect API (file storage, multipart uploads, asset management, and processing jobs), and `SANDBOX_BASE_URL` for the Sandbox Connect API (CPU/GPU notebook bookings and lifecycle). Each can be pointed independently at dev, staging, or production.
 - **`json.loads` for complex payloads** — IUDX item bodies and RS query objects are large, schema-variable JSON objects. Accepting them as raw JSON strings (parsed internally with `_parse()`) avoids an explosion of keyword parameters and works for all current and future IUDX entity types.
 - **Token as a parameter** — Every authenticated tool accepts an explicit `token: str` argument rather than reading from environment variables, keeping the server stateless and easy to test.
 - **Resources are public only** — Resources are URI-addressable and cacheable; only unauthenticated public endpoints are exposed as resources. Auth-gated data is exposed exclusively through tools.
@@ -1314,3 +1496,4 @@ iudx-mcp-server/
 | Resource Server | `https://v2.dev.rs.iudx.io/apis` |
 | Resource Server Proxy | `https://v2.dev.rs.iudx.io/rsp/apis` |
 | Files Connect | `https://v2.dev.file-s3.iudx.io/apis` |
+| Sandbox Connect | `https://v2.dev.sandbox.iudx.io/apis` |

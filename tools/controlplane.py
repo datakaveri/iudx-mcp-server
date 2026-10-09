@@ -1,5 +1,5 @@
 from typing import Any
-from ._app import mcp, _get, _post, _put, _delete, _parse
+from ._app import mcp, _get, _post, _put, _delete, _patch, _parse
 
 
 # ---------------------------------------------------------------------------
@@ -129,13 +129,13 @@ async def approve_org_creation_request(
 
     Args:
         request_id: UUID of the org creation request.
-        action:     "approve" or "reject".
+        action:     "granted" or "rejected".
         token:      Bearer JWT (cos_admin).
     """
     return await _post(
         "/iudx/v2/auth/organisations/requests/approve",
         token=token,
-        body={"requestId": request_id, "action": action},
+        body={"req_id": request_id, "status": action},
     )
 
 
@@ -161,19 +161,19 @@ async def handle_org_join_request(
     action: str,
     token: str,
 ) -> dict:
-    """Approve or reject an organisation join request (POST /iudx/v2/auth/organisations/{org_id}/join_requests/{req_id}).
+    """Approve or reject an organisation join request (PUT /iudx/v2/auth/organisations/{org_id}/join_requests/{req_id}).
 
     Requires org_admin role.
 
     Args:
         org_id:  Organisation UUID.
         req_id:  Join request UUID.
-        action:  "approve" or "reject".
+        action:  "granted" or "rejected".
         token:   Bearer JWT (org_admin).
     """
-    return await _post(
+    return await _put(
         f"/iudx/v2/auth/organisations/{org_id}/join_requests/{req_id}",
-        token=token, body={"action": action},
+        token=token, body={"status": action},
     )
 
 
@@ -193,14 +193,15 @@ async def get_my_profile(token: str) -> dict:
 
 @mcp.tool()
 async def update_my_profile(profile_json: str, token: str) -> dict:
-    """Update the authenticated user's profile (PUT /iudx/v2/auth/user/update).
+    """Update the authenticated user's profile (PUT /iudx/v2/auth/user).
 
     Args:
-        profile_json: JSON string of profile fields to update.
+        profile_json: JSON string e.g. '{"first_name": "A", "last_name": "B",
+                      "twitter_account": "", "linkedin_account": "", "github_account": ""}'.
         token:        Bearer JWT.
     """
     return await _put(
-        "/iudx/v2/auth/user/update", token=token,
+        "/iudx/v2/auth/user", token=token,
         body=_parse(profile_json, "profile_json"),
     )
 
@@ -246,27 +247,26 @@ async def get_credit_balance(token: str) -> dict:
 
 @mcp.tool()
 async def request_credits(request_json: str, token: str) -> dict:
-    """Submit a credit top-up request (POST /iudx/v2/auth/user/credit/request).
+    """Submit a credit top-up request (POST /iudx/v2/auth/credit/request).
 
     Args:
-        request_json: JSON string with credit request details e.g. '{"amount": 100}'.
+        request_json: JSON string e.g. '{"additionalInfo": {"purpose": "research"}}'.
         token:        Bearer JWT.
     """
     return await _post(
-        "/iudx/v2/auth/user/credit/request",
+        "/iudx/v2/auth/credit/request",
         token=token, body=_parse(request_json, "request_json"),
     )
 
 
 @mcp.tool()
-async def get_credit_request(id: str, token: str) -> dict:
-    """Fetch a specific credit request by ID (GET /iudx/v2/auth/user/credit/request/{id}).
+async def list_my_credit_requests(token: str) -> dict:
+    """List the authenticated user's own credit requests (GET /iudx/v2/auth/user/credit/request).
 
     Args:
-        id:    Credit request UUID.
         token: Bearer JWT.
     """
-    return await _get(f"/iudx/v2/auth/user/credit/request/{id}", token=token)
+    return await _get("/iudx/v2/auth/user/credit/request", token=token)
 
 
 @mcp.tool()
@@ -458,14 +458,14 @@ async def get_subscription(id: str, token: str) -> dict:
 
 @mcp.tool()
 async def update_subscription(id: str, subscription_json: str, token: str) -> dict:
-    """Update an existing subscription (PUT /iudx/v2/subscriptions/{id}).
+    """Update an existing subscription (PATCH /iudx/v2/subscriptions/{id}).
 
     Args:
         id:                Subscription UUID.
         subscription_json: JSON string with updated subscription fields.
         token:             Bearer JWT.
     """
-    return await _put(
+    return await _patch(
         f"/iudx/v2/subscriptions/{id}", token=token,
         body=_parse(subscription_json, "subscription_json"),
     )
@@ -511,17 +511,6 @@ async def create_asset_access_request(request_json: str, token: str) -> dict:
 
 
 @mcp.tool()
-async def get_asset_access_request(id: str, token: str) -> dict:
-    """Fetch a specific asset access request by ID (GET /iudx/v2/auth/asset/request/{id}).
-
-    Args:
-        id:    Access request UUID.
-        token: Bearer JWT.
-    """
-    return await _get(f"/iudx/v2/auth/asset/request/{id}", token=token)
-
-
-@mcp.tool()
 async def update_asset_access_request(id: str, update_json: str, token: str) -> dict:
     """Update an asset access request (PUT /iudx/v2/auth/asset/request/{id}).
 
@@ -559,17 +548,6 @@ async def list_my_compute_requests(token: str) -> dict:
         token: Bearer JWT.
     """
     return await _get("/iudx/v2/auth/user/compute/requests", token=token)
-
-
-@mcp.tool()
-async def get_compute_request(id: str, token: str) -> dict:
-    """Fetch a specific compute request by ID (GET /iudx/v2/auth/user/compute/requests/{id}).
-
-    Args:
-        id:    Compute request UUID.
-        token: Bearer JWT.
-    """
-    return await _get(f"/iudx/v2/auth/user/compute/requests/{id}", token=token)
 
 
 @mcp.tool()

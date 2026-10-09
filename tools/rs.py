@@ -25,6 +25,7 @@ async def rs_get_temporal_entities(
     geometry: str = "",
     coordinates: str = "",
     georel: str = "",
+    geoproperty: str = "",
     format: str = "",
     options: str = "",
     aggr_methods: str = "",
@@ -52,6 +53,7 @@ async def rs_get_temporal_entities(
         geometry:      GeoJSON geometry type — Point, Polygon, LineString, bbox.
         coordinates:   Coordinate string matching geometry type.
         georel:        Spatial relation e.g. "near;maxDistance=1000", "within", "intersects".
+        geoproperty:   Property to apply the geo filter on.
         format:        Response format — "simplified" strips NGSI-LD wrappers.
         options:       "aggregatedValues" enables statistical aggregation.
         aggr_methods:  Comma-separated aggregation methods when options=aggregatedValues
@@ -85,6 +87,8 @@ async def rs_get_temporal_entities(
         params["coordinates"] = coordinates
     if georel:
         params["georel"] = georel
+    if geoproperty:
+        params["geoproperty"] = geoproperty
     if format:
         params["format"] = format
     if options:
@@ -162,6 +166,7 @@ async def rs_get_entities(
     geometry: str = "",
     coordinates: str = "",
     georel: str = "",
+    geoproperty: str = "",
     format: str = "",
     did: str = "",
 ) -> dict:
@@ -182,6 +187,7 @@ async def rs_get_entities(
         geometry:     GeoJSON geometry type.
         coordinates:  Coordinate string.
         georel:       Spatial relation.
+        geoproperty:  Property to apply the geo filter on.
         format:       "simplified" strips NGSI-LD wrappers.
         did:          Optional delegation ID header.
     """
@@ -205,6 +211,8 @@ async def rs_get_entities(
         params["coordinates"] = coordinates
     if georel:
         params["georel"] = georel
+    if geoproperty:
+        params["geoproperty"] = geoproperty
     if format:
         params["format"] = format
     return await _rs_get("/ngsi-ld/v1/entities", token=token, did=did, params=params)
