@@ -1,0 +1,3678 @@
+openapi: 3.0.2
+
+info:
+  title: "Data exchange Resource Server APIs"
+  version: 1.1.0
+  description: |
+    # Introduction
+    The Dataplane Server is DXs'(Data exchange) data store which allows publication and discovery of data.
+    For search and discovery, it allows users to search through temporal, geo-based and attribute queries. 
+    It enables *Providers* of datasources to publish data as per the DX(Data exchange) data descriptor.
+    It enables *Consumers* of datasources to search and query for data using HTTPs APIs.
+    
+    # Configurations
+    - **Server**: 
+      - In the doc, we display the server url to be https://v2.dev.iudx.io/dataplane with the hostname as v2.dev.iudx.io/dataplane
+      - This could be configured according to the deployment
+    - **Base path**:
+      - Base path is the path on which API is served, relative to the host
+      - It is the initial part of the API
+      - These base path values could be configured according to the deployment
+      - Currently, the following APIs have `/ngsi-ld/v2` base path
+          -  /entities/{id}
+          -  /entities/{id}/search
+          -  /{id}/download
+      <br>
+    - **Request Samples**:
+      - The `<tokenValue>` in the header of request sample could be replaced with respective token value [Also refer Tokens section [here](#section/Tokens)]
+      - The `<payload>` in the request sample could be replaced with the payload given adjacent to the request sample
+    
+    
+    # Tokens
+    All the <b>*Search API*</b>  calls to the Data plane server should now contain a valid data exchange auth token presented in the query header. To search (or) access an *Open* resource, the consumer should present a valid data exchange Auth token. To search (or) access a *Secure / Closed* resource, a consumer must get a token for the *Secure / Closed* resource along with the associated constraints from the DX(Data exchange) Controlplane Server.
+    
+    # Pagination
+    Resource server also offers way to paginate the result for queries. If a query returns large number of records then user can use additional parameters in query parameters to limit numbers of records to be returned.
+    
+    - <b> Pagination is applicable only for</b>
+       - <b>/entities/{id}</b>
+       - <b>/entities/{id}/search</b>
+       - <b>/{id}/download</b>
+    
+    Additional query parameters to be used:
+      - <b>page</b> : The page parameter defines the page from the first result you want to fetch,  ( <i>default : 1</i> ,<i>minValue: 1</i>, <i>maxValue: 49999</i> )
+      - <b>size</b> : The size parameter allows you to configure the maximum results to be returned  ( <i>default: 100</i> ,<i>minValue: 0</i>, <i>maxValue: 49999</i> )
+
+    # API HTTP Responses
+    Apart from the response codes specified in each API, the API server may respond with certain 4xx and 5xx error codes which are related to common API Gateway behaviours.
+    The application should address them accordingly.
+
+  contact:
+    name: For support contact CDPG Team at
+    email: support@cdpg.org.in
+    url: https://dataforpublicgood.org.in/
+  license:
+    name: Apache 2.0
+
+tags:
+  - name: Temporal Entities
+    x-displayName: "Temporal and Complex Search"
+    description: |
+      A Temporal Search is used by DX(Data exchange) Data *Consumers* for querying a resource using a <b>valid data exchange</b> `id`, `temporal`, `spatial` and `attribute` parameters. <br/> Information about the data exchange ID of the resource and security scope of the resource can be obtained from the <b> DX(Data exchange) catalogue server </b>. <br/>In order to use this API, a `temporal` parameter is <b>mandatory</b>. <br/> You can use this API to make a `temporal` or `complex : temporal+spatial` or `complex : temporal+attribute` or `complex : temporal+spatial+attribute` query. <br/> If you are looking for an `attribute` only query refer the <b>Spatial Search</b> `/entities` endpoint.
+  - name: Entities Spatial
+    x-displayName: "Entities Spatial and Complex Search"
+    description: |
+      A Entities Search is used by DX(Data exchange) Data *Consumers* for querying a resource using a <b>valid data exchange</b> `id`, `spatial` and `attribute` parameters. <br/> Information about the data exchange ID of the resource and security scope of the resource can be obtained from the <b> DX(Data exchange) catalogue server </b>. <br/>In order to use this API, a `id` parameter is <b>mandatory</b>. <br/> You can use this API to make a `entities attributes` or `complex : attribute+spatial` query. <br/> If you are looking for an `temporal`  query refer the <b>Temporal Entities</b> `/temporal/entities` endpoint.
+  - name: Download CSV
+    x-displayName: "Download"
+    description: |
+      Download APIs are used by DX(Data exchange) Data to stream data in csv.
+  - name: Search Entity
+    x-displayName: "Search Data"
+    description: |
+      A Search query is used by DX(Data exchange) Data *Consumers* for discovering entities that meet complex criteria. The `/search` endpoint supports a rich combination of property-based (`term`), range-based, and temporal-based searches and geo-spatial search using a common `searchCriteria` array format.
+  - name: Latest Entity
+    x-displayName: "Latest Data"
+    description: |
+      A Latest Search query is used by DX(Data exchange) Data *Consumers* for querying a resource using a <b>valid data exchange</b> `id`. Information about the data exchange ID of the resource and security scope of the resource can be obtained from the <b> DX(Data exchange) controlplane server </b> . Latest APIs get the latest data belonging to the given valid DX `id`. The user could provide a valid access token while using the API.
+
+servers:
+  - url: 'https://v2.dev.iudx.io/dataplane'
+    description: 'Server URL'
+
+# Global security definition (applies to all paths unless overridden)
+
+paths:
+  /ngsi-ld/v1/temporal/entities:
+    get:
+      tags:
+        - Temporal Entities
+      operationId: getTemporalEntities
+      summary: Temporal Entities Search
+      description: Search for temporal entities with various filters
+      security:
+        - authorization: [ ]
+        - appIdAuth: [ ]
+      parameters:
+        - name: did
+          in: header
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: timerel
+          in: query
+          required: true
+          description: Temporal relation type
+          schema:
+            type: string
+            enum: [ between, before, after]
+        - name: timeAt
+          in: query
+          required: true
+          description: Start time in ISO8601 format
+          schema:
+            type: string
+        - name: endTimeAt
+          in: query
+          description: End time in ISO8601 format
+          schema:
+            type: string
+        - name: timeproperty
+          in: query
+          description: Time property to filter on
+          schema:
+            type: string
+            enum: [ observationDateTime, observedAt ]
+        - name: limit
+          in: query
+          description: Limit the no of data to be shown
+          schema:
+            type: integer
+            minimum: 1
+            default: 100
+        - name: offset
+          in: query
+          description: Offset to see more data
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: lastN
+          in: query
+          description: Get the last N records, and it will sort on time property in descending order.
+          schema:
+            type: integer
+            minimum: 1
+        - name: count
+          in: query
+          description: Include count of matching entities in the response
+          schema:
+            type: boolean
+            default: false
+        - name: q
+          in: query
+          description: For attribute based search. The attribute query is used for querying allowed quantitative properties. Used to query on a value of a resource attribute using <,>,<=,>=,!=, == operators. For e.g, attribute > value, attribute < value, attribute >= value, attribute <= value, attribute != value and attribute == value. Allowed values for all operators is double. For the operator == if the query is on id then the only value allowed is an data exchange ID of a resource. Multiple value is allow with comma(,) separate, maximum 10 values is allowed.
+          schema:
+            type: string
+        - name: omit
+          in: query
+          description: Comma-separated list of properties to omit from the response, maximum value is allow is 5.
+          schema:
+            type: string
+        - name: orderBy
+          in: query
+          description: Comma-separated list of properties to orderBy from the response. By default it is `desc`, when it is given only. Could be used with `asc` or `desc` keyword. E.g., `observationDateTime:desc,speed:asc`, or `observationDateTime,speed:asc`, or `observationDateTime:desc,speed`, or `observationDateTime,speed`
+          schema:
+            type: string
+        - name: pick
+          in: query
+          description: Comma-separated list of properties to pick from the response, maximum value is allow is 5.
+          schema:
+            type: string
+        - name: geometry
+          in: query
+          description: GeoJSON geometry type
+          schema:
+            type: string
+            enum: [ Point, Polygon, LineString, bbox, point, polygon, linestring, BBOX ]
+        - name: coordinates
+          in: query
+          description: Coordinates for the geometry
+          schema:
+            type: string
+        - name: georel
+          in: query
+          description: Spatial relationship type
+          schema:
+            type: string
+            enum: [ near;maxdistance, within, intersects ]
+        - name: geoproperty
+          in: query
+          description: Geospatial property name
+          schema:
+            type: string
+            enum: [ location ]
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [ simplified ]
+        - name: options
+          in: query
+          description: Perform aggregation
+          schema:
+            type: string
+            enum: [ aggregatedValues ]
+        - name: aggrMethods
+          in: query
+          description: Comma separated list of aggregation methods, only applicable when options=aggregatedValues. Supported values are `totalCount`, `distinctCount`, `min`, `max`, `sum`, `avg`, `stddev`.
+          schema:
+            type: string
+            #enum: [ totalCount, distinctCount, min, max, sum, avg, stddev ]
+      responses:
+        '200':
+          description: Successful retrieval of temporal entities
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/temporalEntityresponse'
+                  - $ref: '#/components/schemas/countResponse'
+            application/ld+json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/temporalEntityresponse2'
+                  - $ref: '#/components/schemas/countResponse'
+            application/geo+json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/temporalEntityresponse2'
+                  - $ref: '#/components/schemas/countResponse'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NgsiLdSubscriptionErrorResponse400'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NgsiLdSubscriptionErrorResponse401'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NgsiLdSubscriptionErrorResponse404'
+#        '413':
+#          description: Payload Too Large
+#          content:
+#            application/json:
+#              schema:
+#                $ref: '#/components/schemas/NgsiLdSubscriptionErrorResponse413'
+
+  /ngsi-ld/v1/entities:
+    get:
+      tags:
+        - Entities Spatial
+      operationId: getEntitiesSpatial
+      summary: Entities Attribute and Spatial Search
+      description: Search for spatial and attribute entities with various filters
+      security:
+        - authorization: [ ]
+        - appIdAuth: [ ]
+      parameters:
+        - name: did
+          in: header
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+
+        - name: limit
+          in: query
+          description: Limit the no of data to be shown
+          schema:
+            type: integer
+            minimum: 1
+            default: 100
+        - name: offset
+          in: query
+          description: Offset to see more data
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: count
+          in: query
+          description: Include count of matching entities in the response
+          schema:
+            type: boolean
+            default: false
+        - name: orderBy
+          in: query
+          description: Comma-separated list of properties to orderBy from the response. By default it is `desc`, when it is given only. Could be used with `asc` or `desc` keyword. E.g., `observation:desc,speed:asc`, or `observation,speed:asc`, or `observation:desc,speed`, or `observation,speed`
+          schema:
+            type: string
+        - name: q
+          in: query
+          description: For attribute based search. The attribute query is used for querying allowed quantitative properties. Used to query on a value of a resource attribute using <,>,<=,>=,!=, == operators. For e.g, attribute > value, attribute < value, attribute >= value, attribute <= value, attribute != value and attribute == value. Allowed values for all operators is double. For the operator == if the query is on id then the only value allowed is an data exchange ID of a resource. Multiple value is allow with comma(,) separate, maximum 10 values is allowed.
+          schema:
+            type: string
+        - name: omit
+          in: query
+          description: Comma-separated list of properties to omit from the response, maximum value is allow is 5.
+          schema:
+            type: string
+        - name: pick
+          in: query
+          description: Comma-separated list of properties to pick from the response, maximum value is allow is 5.
+          schema:
+            type: string
+        - name: geometry
+          in: query
+          description: GeoJSON geometry type
+          schema:
+            type: string
+            enum: [ Point, Polygon, LineString, bbox, point, polygon, linestring, BBOX ]
+        - name: coordinates
+          in: query
+          description: Coordinates for the geometry
+          schema:
+            type: string
+        - name: georel
+          in: query
+          description: Spatial relationship type
+          schema:
+            type: string
+            enum: [ near;maxdistance, within, intersects ]
+        - name: geoproperty
+          in: query
+          description: Geospatial property name
+          schema:
+            type: string
+            enum: [ location ]
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [ simplified ]
+      responses:
+        '200':
+          description: Successful retrieval of temporal entities
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/spatialAttributeEntityresponse'
+                  - $ref: '#/components/schemas/countResponse'
+            application/ld+json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/spatialAttributeEntityresponse2'
+                  - $ref: '#/components/schemas/countResponse'
+            application/geo+json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/spatialAttributeEntityresponse2'
+                  - $ref: '#/components/schemas/countResponse'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NgsiLdSubscriptionErrorResponse400'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NgsiLdSubscriptionErrorResponse401'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NgsiLdSubscriptionErrorResponse404'
+#        '413':
+#          description: Payload Too Large
+#          content:
+#            application/json:
+#              schema:
+#                $ref: '#/components/schemas/NgsiLdSubscriptionErrorResponse413'
+
+  /ngsi-ld/v1/entityOperations/query:
+    post:
+      tags:
+        - Entities Spatial
+      summary: Entities Spatial and Attribute Post Search Query
+      security:
+        - authorization: [ ]
+        - appIdAuth: [ ]
+      operationId: postEntitiesSearch
+      parameters:
+        - name: did
+          in: header
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          description: Limit the no of data to be shown
+          schema:
+            type: integer
+            minimum: 1
+            default: 100
+        - name: offset
+          in: query
+          description: Offset to see more data
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: count
+          in: query
+          description: Include count of matching entities in the response
+          schema:
+            type: boolean
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [ simplified ]
+      requestBody:
+        description: 'Entities Spatial and Attribute request body'
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/complex-entities-geo'
+            example:
+              {
+                "type": "Query",
+                "entities": [
+                  {
+                    "id": "UUID"
+                  }
+                ],
+                "geoQ": {
+                  "geometry": "Point",
+                  "coordinates": [ 21.178,72.834 ],
+                  "georel": "near;maxDistance=1000",
+                  "geoproperty": "location"
+                },
+                "q": "speed>30.0",
+                "pick": "id,speed"
+              }
+        required: false
+
+      responses:
+        200:
+          description: 'Successful complex search query'
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/spatialAttributeEntityresponse'
+                  - $ref: '#/components/schemas/countResponse'
+            application/ld+json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/spatialAttributeEntityresponse2'
+                  - $ref: '#/components/schemas/countResponse'
+            application/geo+json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/spatialAttributeEntityresponse2'
+                  - $ref: '#/components/schemas/countResponse'
+
+        400:
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/NgsiLdSubscriptionErrorResponse400"
+          description: 'Bad query | Missing/Invalid temporal parameters | Missing/Invalid geo parameters'
+
+        401:
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/NgsiLdSubscriptionErrorResponse401"
+          description: Unauthorized
+
+#        413:
+#          content:
+#            application/json:
+#              schema:
+#                "$ref": "#/components/schemas/NgsiLdSubscriptionErrorResponse413"
+#          description: 'Payload Too Large'
+
+        404:
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/NgsiLdSubscriptionErrorResponse404"
+          description: 'Not found'
+
+      description: |
+        The `/entityOperations/query` end point allows a consumer to query on data published based on a <b>spatial</b> and <b>attribute</b> properties. The <b>spatial</b> queries should be submitted as a geo json as described in the API. All the queries requires a <b> valid data exchange</b> `id` of the resource within the `entities` json object as per the schema. These apis are intended to be used by DX(Data exchange) Data *Consumers*.
+
+          - <b>Allowed Search Operations</b>:
+              - <b> Spatial (Geo) Search : </b> which queries the geo property of the resource.
+              - <b> Attribute Search : </b> which queries the valid attributes as per the data descriptor.
+              - <b> Complex Search : </b> which queries using the combination of the above three.
+
+        #### Spatial (Geo) Search
+        Geo search accepts geojson based queries. The params and their accepted values are briefed below -
+          - <b>geoproperty</b>: 
+              - Specifies the name of the <b> geospatial </b> property in the <b> DX(Data exchange) data descriptor </b>.
+              - The current version of the API <b> mandates </b> it to be equal to `location`
+          - <b>georel</b>:   
+              - Specifies the spatial relationship to be queried.
+              - The relation type of <b>geoquery</b> can be <b>one of</b> `near;maxdistance=<distance_in_meters>`, `within`, `intersects`.
+              - The relation <b> near </b> should be always accomodated with a <b> maxdistance </b> property.
+              - Apart from <b> maxdistance</b> , all other fields in the Enum list are <b> case sensitive </b> fields.
+              - The relation <b> near;maxdistance </b> is applicable only for a <b> point </b>.
+              - The relation <b> within </b> and  <b> intersects </b> are applicable only for <b> bbox, polygon and linestring</b>.
+
+          - <b>geometry</b>:  
+              - Specifies the GeoJson geometries. 
+              - Should be One of `Point`(equivalent for a circle), `Polygon`, `LineString`, `bbox`.
+              - <b>Point</b>: Point and radius query
+                  - coordinates: Specifies the  center point of the circle, for e.g, `[73,13]`. <br/>Note, format is [longitude, latitude]
+                  - maxDistance: Specifies the Radius from the center point in meters, for e.g `100`. `maxValue` : 1000
+                  - georel: In this version of DX(Data exchange) API, the allowed relationship search for a circle is `near` with a `maxdistance` in meters specified. This will be equivalent to a `within` query. Format is `near;maxdistance=<distance_in_meters>` 
+              - <b>Polygon</b>: Polygon/Multi-Polygon query
+                  - coordinates: Specifies the  coordinates of the polygon, for e.g, `[[[73,13],[73,12],[73,13]]]`.  <br/>Note, format is [longitude, latitude] and the first coordinate must be same as last. 
+                  - `minNumberOfCoOrdinates` : 4 and `maxnNumberOfCoOrdinates` : 10
+                  - georel: `within`, `intersects`
+              - <b>LineString</b>: Multi line string
+                  - coordinates: Specifies the coordinates of the multi-line, for e.g, `[[73,13],[74,15],[75,16]]`. <br/>Note, format is [longitude, latitude]
+                  - `minNumberOfCoOrdinates` : 2 and `maxnNumberOfCoOrdinates` : 10
+                  - georel:  `within`, `intersects`
+              - <b>bbox</b>: Bounding box
+                  - coordinates: `[[top-left],[bottom-right]]`. e.g, `[[73,13],[74,12]]`. <br/>Note, format is [longitude, latitude].
+                  - georel:  `within`, `intersects`
+
+        #### Attribute search
+        The attribute query is used for querying <b> allowed quantitative</b> properties. 
+          - Used to query on a value of a resource attribute using `<`,`>`,`<=`,`>=`,`!=`,`==` operators. 
+          - For e.g, attribute > value, attribute < value, attribute >= value, attribute <= value and attribute == value. 
+          - Allowed values for all operators is double. 
+          - For the operator `==` if the query is on `id` then the only value allowed is an `data exchange ID` of a resource. 
+          - e.g, `q=attribute-name>attribute-value`
+
+        #### Complex search
+        A combination of the above is allowed to make searches more complex.
+
+        #### Filters
+          - A subset of properties of returned documents can be filtered out. This is an option parameter. <br/>For e.g, `pick=[id]` returns documents with only the `id` property retained in them. 
+          - `minNumberOfAttributes` : 1 and `maxNumberOfAttributes` : 5 
+
+        #### Count
+          - The <b>count</b> parameter is used for obtaining the <b>number of hits</b> for a query. 
+          - It should be used along with the <b> valid </b> `complex` queries. 
+          - The value should be equal to `count` and it is <b>case sensitive</b>
+      deprecated: false
+
+  /ngsi-ld/v1/temporal/entityOperations/query:
+    post:
+      tags:
+        - Temporal Entities
+      summary: Temporal Post Search Query
+      security:
+        - authorization: [ ]
+        - appIdAuth: [ ]
+      operationId: postTemporalEntitiesSearch
+      parameters:
+        - name: did
+          in: header
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          description: Limit the no of data to be shown
+          schema:
+            type: integer
+            minimum: 1
+            default: 100
+        - name: offset
+          in: query
+          description: Offset to see more data
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: count
+          in: query
+          description: Include count of matching entities in the response
+          schema:
+            type: boolean
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [ simplified ]
+      requestBody:
+        description: 'Temporal Entities request body'
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/complex-temporal-geo'
+            example:
+              {
+                "type": "Query",
+                "entities": [
+                  {
+                    "id": "UUID"
+                  }
+                ],
+                "geoQ": {
+                  "geometry": "Point",
+                  "coordinates": [ 21.178,72.834 ],
+                  "georel": "near;maxDistance=1000",
+                  "geoproperty": "location"
+                },
+                "temporalQ": {
+                  "timerel": "between",
+                  "timeAt": "2020-10-18T14:20:00Z",
+                  "endTimeAt": "2020-10-19T14:20:00Z",
+                  "timeproperty": "observationDateTime"
+                },
+                "q": "speed>30.0",
+                "pick": "id,speed"
+              }
+        required: false
+
+      responses:
+        200:
+          description: 'Successful complex search query'
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/temporalEntityresponse'
+                  - $ref: '#/components/schemas/countResponse'
+            application/ld+json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/temporalEntityresponse2'
+                  - $ref: '#/components/schemas/countResponse'
+            application/geo+json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/temporalEntityresponse2'
+                  - $ref: '#/components/schemas/countResponse'
+
+        400:
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/NgsiLdSubscriptionErrorResponse400"
+          description: 'Bad query | Missing/Invalid temporal parameters | Missing/Invalid geo parameters'
+
+        401:
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/NgsiLdSubscriptionErrorResponse401"
+          description: Unauthorized
+
+#        413:
+#          content:
+#            application/json:
+#              schema:
+#                "$ref": "#/components/schemas/NgsiLdSubscriptionErrorResponse413"
+#          description: 'Payload Too Large'
+
+        404:
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/NgsiLdSubscriptionErrorResponse404"
+          description: 'Resource not found'
+
+      description: |
+        The `/temporal/entityOperations/query` end point allows a consumer to query on data published based on a <b>spatial</b>,<b> temporal </b> and <b>attribute</b> properties. The <b>spatial</b> queries should be submitted as a geo json as described in the API. All the queries requires a <b> valid data exchange</b> `id` of the resource within the `entities` json object as per the schema. These apis are intended to be used by DX(Data exchange) Data *Consumers*.
+
+          - <b>Allowed Search Operations</b>:
+              - <b> Temporal Search : </b> which queries the temporal property of the resource.
+              - <b> Spatial (Geo) Search : </b> which queries the geo property of the resource.
+              - <b> Attribute Search : </b> which queries the valid attributes as per the data descriptor.
+              - <b> Complex Search : </b> which queries using the combination of the above three.
+
+        #### Temporal search
+        Temporal search accepts time property based queries which are specified in ISO 8601 format. The params and their accepted values are -
+          - <b>timerel</b>: The time relation of the query. Should be either `between`, `before` or `after`.
+          - <b>timeAt</b>: Start time for the temporal query in `ISO 8601` format. 
+          - <b>endTimeAt</b>: End time for the temporal query in `ISO 8601` format. Applicable only for `timerel = between`. 
+          - <b>timeproperty</b>: The time property tell us on which field we are applying time. By default it is 'observationDateTime'. Allowed values are `observationDateTime` and `observedAt`.
+          - Note, The time difference between `timeAt` and `endTimeAt` should be less than `20 days`. For `before` and `after` queries, `10 days` of data `before` or `after` the specified time will be provided.
+
+        #### Spatial (Geo) Search
+        Geo search accepts geojson based queries. The params and their accepted values are briefed below -
+          - <b>geoproperty</b>: 
+              - Specifies the name of the <b> geospatial </b> property in the <b> DX(Data exchange) data descriptor </b>.
+              - The current version of the API <b> mandates </b> it to be equal to `location`
+          - <b>georel</b>:   
+              - Specifies the spatial relationship to be queried.
+              - The relation type of <b>geoquery</b> can be <b>one of</b> `near;maxdistance=<distance_in_meters>`, `within`, `intersects`.
+              - The relation <b> near </b> should be always accomodated with a <b> maxdistance </b> property.
+              - Apart from <b> maxdistance</b> , all other fields in the Enum list are <b> case sensitive </b> fields.
+              - The relation <b> near;maxdistance </b> is applicable only for a <b> point </b>.
+              - The relation <b> within </b> and  <b> intersects </b> are applicable only for <b> bbox, polygon and linestring</b>.
+
+          - <b>geometry</b>:  
+              - Specifies the GeoJson geometries. 
+              - Should be One of `Point`(equivalent for a circle), `Polygon`, `LineString`, `bbox`.
+              - <b>Point</b>: Point and radius query
+                  - coordinates: Specifies the  center point of the circle, for e.g, `[73,13]`. <br/>Note, format is [longitude, latitude]
+                  - maxDistance: Specifies the Radius from the center point in meters, for e.g `100`. `maxValue` : 1000
+                  - georel: In this version of DX(Data exchange) API, the allowed relationship search for a circle is `near` with a `maxdistance` in meters specified. This will be equivalent to a `within` query. Format is `near;maxdistance=<distance_in_meters>` 
+              - <b>Polygon</b>: Polygon/Multi-Polygon query
+                  - coordinates: Specifies the  coordinates of the polygon, for e.g, `[[[73,13],[73,12],[73,13]]]`.  <br/>Note, format is [longitude, latitude] and the first coordinate must be same as last. 
+                  - `minNumberOfCoOrdinates` : 4 and `maxnNumberOfCoOrdinates` : 10
+                  - georel: `within`, `intersects`
+              - <b>LineString</b>: Multi line string
+                  - coordinates: Specifies the coordinates of the multi-line, for e.g, `[[73,13],[74,15],[75,16]]`. <br/>Note, format is [longitude, latitude]
+                  - `minNumberOfCoOrdinates` : 2 and `maxnNumberOfCoOrdinates` : 10
+                  - georel:  `within`, `intersects`
+              - <b>bbox</b>: Bounding box
+                  - coordinates: `[[top-left],[bottom-right]]`. e.g, `[[73,13],[74,12]]`. <br/>Note, format is [longitude, latitude].
+                  - georel:  `within`, `intersects`
+
+        #### Attribute search
+        The attribute query is used for querying <b> allowed quantitative</b> properties. 
+          - Used to query on a value of a resource attribute using `<`,`>`,`<=`,`>=`,`!=`,`==` operators. 
+          - For e.g, attribute > value, attribute < value, attribute >= value, attribute <= value and attribute == value. 
+          - Allowed values for all operators is double. 
+          - For the operator `==` if the query is on `id` then the only value allowed is an `data exchange ID` of a resource. 
+          - e.g, `q=attribute-name>attribute-value`
+
+        #### Complex search
+        A combination of the above is allowed to make searches more  complex.
+
+        #### Filters
+          - A subset of properties of returned documents can be filtered out. This is an option parameter. <br/>For e.g, `pick=[id]` returns documents with only the `id` property retained in them. 
+          - `minNumberOfAttributes` : 1 and `maxNumberOfAttributes` : 5 
+
+        #### Count
+          - The <b>count</b> parameter is used for obtaining the <b>number of hits</b> for a query. 
+          - It should be used along with the <b> valid </b> `complex` queries. 
+          - The value should be equal to `count` and it is <b>case sensitive</b>
+      deprecated: false
+
+  /ngsi-ld/v2/entities/{id}:
+    get:
+      tags:
+        - Latest Entity
+      summary: Latest Data
+      operationId: getLatestEntityData
+      description:
+        'The <b>Latest Data API</b> returns the latest (last published) data of a resource,
+        identified by its <b>data exchange ID</b> (`id`). A <b>valid data exchange token</b> is mandatory.
+        By default, data is sorted in descending order of `observationDateTime`(TEMPORAL data).
+        <b>Temporal resources</b> support `timeRel`, `time` and `endTime`. Narrow the time window to
+       stay within the 50,000 limit. If total matched records exceed 50,000, apply more filters or use the <b>Download API</b>.
+       <b>Non-temporal (attribute / ATTR) resources</b> have no time dimension, so `timeRel`, `time`
+       and `endTime` do not apply and data cannot be narrowed by time. Only the first 50,000 records
+       are reachable via pagination; to retrieve the full dataset use the <b>Download API</b>.
+        <b>Retrieving more than 50,000 records:</b> this endpoint is for paginated browsing and is
+        capped at 50,000 reachable records. To export a complete dataset, use the Download API, which
+        streams all matching data as CSV without the pagination limit.'
+      security:
+        - authorization: [ ]
+        - appIdAuth: [ ]
+      parameters:
+        - name: did
+          in: header
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: id
+          in: path
+          description: 'A <b> valid data exchange ID </b> of the resource. <br/> Information about the data exchange ID of the resource and security scope of the resource can be obtained from the <b> DX(Data exchange) Controlplane server </b> .'
+          required: true
+          schema:
+            type: string
+            format: uuid
+            maxLength: 36
+        - name: page
+          in: query
+          description: 'The page parameter is used to specify the page number of the result set. <br/> It is an optional parameter. <br/> If not provided, it defaults to 1. Constraint: page × size must not exceed 50,000.'
+          required: false
+          schema:
+            type: integer
+        - name: size
+          in: query
+          description: 'The size parameter is used to specify the number of results per page. <br/> It is an optional parameter. <br/> If not provided, it defaults to 10. Constraint: page × size must not exceed 50,000.'
+          required: false
+          schema:
+            type: integer
+        - name: timeRel
+          in: query
+          description: 'The temporal relation type of <b>timerel</b> to be performed. <br/> This <b>should</b> be one from the available options in the Enum list. <br/> If the relation is <b> between </b> it should be always accomodated with a <b> time </b> and <b> endtime </b> property.  <br/> If the relation is <b> before </b> or <b> after </b>it should be always accomodated <b> only</b> with a <b> time </b> property. Not applicable to non-temporal 
+          (ATTR) resources.'
+          required: false
+          schema:
+            type: string
+            enum: [ between, before, after ,during ]
+        - name: time
+          in: query
+          description: 'This parameter specifies the <b>start time</b> for the temporal-query in `ISO8601` format. <br/> data exchange currently accepts `IST` and `UTC` time zones for the temporal query.'
+          required: false
+          schema:
+            type: string
+        - name: endTime
+          in: query
+          description: 'This parameter specifies the <b>end time</b> for the temporal-query in `ISO8601` format. <br/> data exchange currently accepts `IST` and `UTC` time zones for the temporal query. <br/>If <b>timerel</b> is `between` time and endtime are mandatory'
+          required: false
+          schema:
+            type: string
+        - name: sort
+          in: query
+          description: 'This parameter is used to sort the results basis on this property. <br/> The default sortBy property is `observationDateTime:desc` . <br/> The user could provide any property among `observationDateTime` and `itemCreatedAt` of the resource to sort the data. <br/> If the user provides a property which is not part of the resource, the API will throw a `400-Bad Request` error.'
+          required: false
+          schema:
+            type: string
+            enum: [ observationDateTime:desc, itemCreatedAt:desc, observationDateTime:asc, itemCreatedAt:asc ]
+
+      responses:
+        200:
+          description: 'Successful retrieval of latest data'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/entityresponse'
+
+        400:
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/invalidParamBadRequestErrorResponseLatestGet"
+          description: 'Bad query - Empty response | Missing/Invalid parameters'
+
+        401:
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/standardInvalidTokenErrorResponse"
+          description: 'Unauthorized - Invalid/missing token'
+
+        403:
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenResponse'
+
+        404:
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/standardResourceNotFoundErrorResponse"
+          description: 'Resource not found'
+
+#        413:
+#          content:
+#            application/json:
+#              schema:
+#                "$ref": "#/components/schemas/payloadTooLarge"
+#          description: 'Payload Too Large'
+
+      x-codeSamples:
+        - lang: 'cURL'
+          label: 'get latest data'
+          source: |
+            curl --location --request GET 'https://v2.dev.iudx.io/dataplane/ngsi-ld/v2/entities/f29d4456-b712-4b96-af64-82916bffcb62' \
+            --header 'Authorization: Bearer <tokenValue>'
+
+          description: |
+            The <b> Latest Data API </b> is used to get the latest (last published) data of a resource. <br /> It uses the <b> data exchange ID </b> a.k.a `id` to query the resource server. <br />  To get data a <b> valid data exchange Auth token</b> is mandatory.  <br/> The `/entities` end point followed by `id` as a <b>path parameter</b> is used to get the latest data.
+
+      deprecated: false
+
+  /ngsi-ld/v2/entities/{id}/search:
+    post:
+      tags:
+        - Search Entity
+      summary: Data Post Search
+      description: |
+        Unified search query for discovering entities that meet complex criteria. The `/search` endpoint supports a rich combination of property-based (`term`), range-based, temporal-based, and geo-based searches using a common `searchCriteria` array format.
+        
+        #### 📌 `searchCriteria` Format (Unified)
+        Each entry in `searchCriteria` must define:
+        - `searchType`: Determines the type of search (e.g., `term`, `betweenRange`, `beforeTemporal`, etc.)
+        - `field`: Field to search on (e.g., `type`, `dataReadiness`, `itemCreatedAt`)
+        - `values`: Array of values (length depends on `searchType`)
+        
+        #### ✅ Supported `searchType` Values and Value Expectations:
+        | `searchType`         | Description                                 | Expected `values` Length |
+        |----------------------|---------------------------------------------|---------------------------|
+        | `term`               | Property-based (exact/approx match)         | ≥ 1 values (OR logic)     |
+        | `betweenRange`       | Numeric field in a value range              | 2 values (start, end)     |
+        | `beforeRange`        | Numeric field before a value                | 1 value                   |
+        | `afterRange`         | Numeric field after a value                 | 1 value                   |
+        | `betweenTemporal`    | Timestamp field between two dates           | 2 ISO datetime strings    |
+        | `beforeTemporal`     | Timestamp before a given date               | 1 ISO datetime string     |
+        | `afterTemporal`      | Timestamp after a given date                | 1 ISO datetime string     |
+        
+        #### 🧠 Term Search (Property-based)
+        Property search is allowed only on a predefined set of properties from the DX Schema Vocabulary, applicable to all subClasses of [IUDXEntity](https://voc.iudx.org.in/IUDXEntity).
+        
+        - Exact match: Supported for fields like `id`, `type`, `department`, `organizationType`, `modelType`. <br>
+        
+        Example:
+        ```json
+        {
+          "searchCriteria": [
+            {
+              "searchType": "term",
+              "field": "type",
+              "values": ["adex:DataBank"]
+            },
+            {
+              "searchType": "term",
+              "field": "department",
+              "values": ["Health", "Environment"]
+            }
+          ]
+        }
+        ```
+        
+        #### 📈 Range Search (Numeric)
+        Filters based on numeric values and supports various relational conditions.
+        - Supported `searchType` values:
+          - "betweenRange" → values: [min, max]
+          - "beforeRange" → values: [value] (less than)
+          - "afterRange" → values: [value] (greater than)
+        Example:
+        ```json
+        {
+          "searchType": "betweenRange",
+          "field": "dataReadiness",
+          "values": [50, 80]
+        }
+        ```
+        
+        #### 🕒 Temporal Search
+        Filters based on ISO 8601 timestamps for temporal fields.
+        - Supported `searchType` values:
+          - "betweenTemporal" → values: ["startTime", "endTime"]
+          - "beforeTemporal" → values: ["timestamp"]
+          - "afterTemporal" → values: ["timestamp"]
+        Timestamps must be in ISO 8601 format (`YYYY-MM-DDTHH:mm:ss±hhmm`).
+        Example:
+        ```json
+        {
+          "searchType": "beforeTemporal",
+          "field": "observationDateTime",
+          "values": ["2025-04-30T00:00:00+05:30"]
+        }
+        ```
+        
+        #### Text Search
+        A full-text fuzzy search over indexed fields.
+        - Use the `q` field in the root body.
+        - Optional flags: `autoComplete`, `fuzzy`.
+        
+        #### Complex Search
+        Multiple search types—text, property-based (`term`), temporal, and numeric range—can be combined together in a single request using the `searchCriteria` array. Each object in `searchCriteria` must include a `searchType`, the `field` to query, and the appropriate `values` for that type.
+        
+        Text-based search can be combined with structured filters. It supports full-text fuzzy matching across indexed fields.
+        
+        #### Supported fields for complex search:
+        
+        - `q`: A free-form text string to perform full-text search across indexed fields.
+        - `fuzzy`: (Optional, boolean) Enables approximate/fuzzy matching.
+        - `autoComplete`: (Optional, boolean) Enables search-as-you-type behavior.
+        
+        #### Spatial (Geo) Search
+        Geo search accepts geojson based queries. The params and their accepted values are briefed below -
+          - <b>geoproperty</b>: 
+              - Specifies the name of the <b> geospatial </b> property in the <b> DX(Data exchange) data descriptor </b>.
+              - The current version of the API <b> mandates </b> it to be equal to `location`
+          - <b>georel</b>:   
+              - Specifies the spatial relationship to be queried.
+              - The relation type of <b>geoquery</b> can be <b>one of</b> `near;maxdistance=<distance_in_meters>`, `within`, `intersects`.
+              - The relation <b> near </b> should be always accomodated with a <b> maxdistance </b> property.
+              - Apart from <b> maxdistance</b> , all other fields in the Enum list are <b> case sensitive </b> fields.
+              - The relation <b> near;maxdistance </b> is applicable only for a <b> point </b>.
+              - The relation <b> within </b> and  <b> intersects </b> are applicable only for <b> bbox, polygon and linestring</b>.
+
+          - <b>geometry</b>:  
+              - Specifies the GeoJson geometries. 
+              - Should be One of `Point`(equivalent for a circle), `Polygon`, `LineString`, `bbox`.
+              - <b>Point</b>: Point and radius query
+                  - coordinates: Specifies the  center point of the circle, for e.g, `[73,13]`. <br/>Note, format is [longitude, latitude]
+                  - maxDistance: Specifies the Radius from the center point in meters, for e.g `100`. `maxValue` : 1000
+                  - georel: In this version of DX(Data exchange) API, the allowed relationship search for a circle is `near` with a `maxdistance` in meters specified. This will be equivalent to a `within` query. Format is `near;maxdistance=<distance_in_meters>` 
+              - <b>Polygon</b>: Polygon/Multi-Polygon query
+                  - coordinates: Specifies the  coordinates of the polygon, for e.g, `[[[73,13],[73,12],[73,13]]]`.  <br/>Note, format is [longitude, latitude] and the first coordinate must be same as last. 
+                  - `minNumberOfCoOrdinates` : 4 and `maxnNumberOfCoOrdinates` : 10
+                  - georel: `within`, `intersects`
+              - <b>LineString</b>: Multi line string
+                  - coordinates: Specifies the coordinates of the multi-line, for e.g, `[[73,13],[74,15],[75,16]]`. <br/>Note, format is [longitude, latitude]
+                  - `minNumberOfCoOrdinates` : 2 and `maxnNumberOfCoOrdinates` : 10
+                  - georel:  `within`, `intersects`
+              - <b>bbox</b>: Bounding box
+                  - coordinates: `[[top-left],[bottom-right]]`. e.g, `[[73,13],[74,12]]`. <br/>Note, format is [longitude, latitude].
+                  - georel:  `within`, `intersects`
+        
+        
+        #### Supported `searchType` values in `searchCriteria`:
+        
+        - `term`: Property-based filtering using exact or fuzzy match. Accepts one or more
+        values. (OR logic on values.)
+        - `betweenTemporal`: Requires exactly **two** ISO 8601 datetime strings — interpreted as start and end time.
+        - `beforeTemporal`: Requires exactly **one** ISO 8601 datetime string — filters entries before the given time.
+        - `afterTemporal`: Requires exactly **one** ISO 8601 datetime string — filters entries after the given time.
+        - `betweenRange`: Requires exactly **two** numeric values — interpreted as lower and upper bounds.
+        - `beforeRange`: Requires exactly **one** numeric value — filters entries below the threshold.
+        - `afterRange`: Requires exactly **one** numeric value — filters entries above the threshold.
+        
+        This unified format supports rich multi-dimensional filtering with both structured and unstructured (text) data.
+        
+        #### Example:
+        ```json
+        {
+          "q": "satellite",
+          "fuzzy": true,
+          "autoComplete": true,
+          "searchCriteria": [
+            {
+              "searchType": "term",
+              "field": "type",
+              "values": ["adex:DataBank"]
+            },
+            {
+              "searchType": "betweenTemporal",
+              "field": "itemCreatedAt",
+              "values": ["2024-01-01T00:00:00+05:30", "2025-01-01T00:00:00+05:30"]
+            },
+            {
+               "searchType": "afterRange",
+               "field": "dataReadiness",
+               "values": [70]
+            }
+          ]
+        }
+        ```
+        
+        #### Limits and Filters
+        - Pagination: Use `size` and `page` parameters to paginate results.
+          For example, `size=100&page=2` returns 100 results starting from the 101st record (i.e., page 2).
+          Internally, the offset is calculated as `offset = size * (page - 1)`.
+        - Field Filtering: Use the `filter` parameter to specify a subset of fields to return.
+          For example, `filter=[id]` returns only the `id` field for each result.
+        - Limits: The sum of the internally calculated `offset` and `size` must be less than or equal to `10,000` to prevent overly large queries.
+
+      operationId: postLatestEntityDataSearch
+      security:
+        - authorization: [ ]
+        - appIdAuth: [ ]
+      parameters:
+        - name: did
+          in: header
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: id
+          in: path
+          required: true
+          description: 'A <b> valid data exchange ID </b> of the resource. <br/> Information about the data exchange ID of the resource and security scope of the resource can be obtained from the <b> DX(Data exchange) Controlplane server </b> .'
+          schema:
+            type: string
+            format: uuid
+        - name: page
+          in: query
+          description: Page number for pagination
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: size
+          in: query
+          description: Page size for pagination
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 100
+        - name: sort
+          in: query
+          description: >
+            This parameter allows sorting the results by up to 3 fields, separated by a semicolon (;).
+            The format for each field is `fieldName:asc` or `fieldName:desc`.
+            For example: `itemCreatedAt:desc;dataReadiness:asc;name:desc` will sort by creation date (descending),
+            then dataReadiness (ascending), then name (descending).
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              anyOf:
+                - $ref: '#/components/schemas/TextSearchRequest'
+                - $ref: '#/components/schemas/SearchCriteriaRequest'
+                - $ref: '#/components/schemas/AutocompleteFuzzyTextSearchRequest'
+                - $ref: '#/components/schemas/ComplexSearchRequest'
+                - $ref: '#/components/schemas/AutocompleteFuzzyTextSearchRequest'
+                - $ref: '#/components/schemas/GeoSearchRequest'
+      responses:
+        '200':
+          description: All the query parameters yielded results.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/successResponseForAutocompleteFuzzyTextSearch'
+                  - $ref: '#/components/schemas/successResponseForSearchByItemType'
+                  - $ref: '#/components/schemas/successResponseForRangeSearch'
+                  - $ref: '#/components/schemas/successResponseForTemporalSearch'
+                  - $ref: '#/components/schemas/successResponseForComplexSearch'
+        '401':
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/standardInvalidTokenErrorResponse"
+          description: 'Unauthorized - Invalid/missing token'
+
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenResponse'
+#        '413':
+#          content:
+#            application/json:
+#              schema:
+#                "$ref": "#/components/schemas/payloadTooLarge"
+#          description: 'Payload Too Large'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/errorResponseForDiscovery'
+              examples:
+                Bad Request:
+                  value:
+                    "type": "dx:dataplane:badRequest"
+                    "title": "Bad Request"
+                    "detail": "Missing or malformed request"
+                Invalid Geo Value:
+                  value:
+                    type: 'dx:dataplane:InvalidGeoValue'
+                    "title": "Geoquery value error"
+                    "detail": "Invalid value for a query param"
+                Invalid Syntax:
+                  value:
+                    "type": "dx:dataplane:InvalidSyntax"
+                    "title": "Invalid Syntax"
+                    "detail": "Invalid value for a query param"
+                Invalid Syntax 1:
+                  value:
+                    "type": "dx:dataplane:InvalidSyntax"
+                    "title": "Invalid Syntax"
+                    "detail": "Mandatory field(s) not provided"
+                Precision validation:
+                  value:
+                    "title": "failed"
+                    "type": "dx:dataplane:InvalidPropertyValue"
+                    "detail": "The max point of 'coordinates' precision is 6"
+                Coordinate pair:
+                  value:
+                    "title": "failed"
+                    "type": "dx:dataplane:InvalidPropertyValue"
+                    "detail": "The max number of 'coordinates' value is 10"
+                Max Distance limit:
+                  value:
+                    "title": "failed"
+                    "type": "dx:dataplane:InvalidPropertyValue"
+                    "detail": "The 'maxDistance' should range between 0-10000m"
+                Coordinates value limit:
+                  value:
+                    "title": "failed"
+                    "type": "dx:dataplane:InvalidPropertyValue"
+                    "detail": "Unable to parse 'coordinates'; value is Infinity"
+                Invalid request - Max string size:
+                  value:
+                    "title": "failed"
+                    "type": "dx:dataplane:InvalidPropertyValue"
+                    "detail": "The max string(q) size supported is 100"
+                Bad filter:
+                  value:
+                    "title": "failed"
+                    "type": "dx:dataplane:BadFilter"
+                    "detail": "The max number of 'filter' should be 10"
+                Exceed limit|offset value:
+                  value:
+                    "title": "failed"
+                    "type": "dx:dataplane:InvalidPropertyValue"
+                    "detail": "The limit + offset should be between 1 to 10000"
+
+      x-codeSamples:
+        - lang: 'cURL'
+          label: 'post search data'
+          source: |
+            curl --location --request POST 'https://v2.dev.iudx.io/dataplane/ngsi-ld/v2/entities/f29d4456-b712-4b96-af64-82916bffcb62/search' \
+            --header 'Authorization: Bearer <tokenValue>' \
+            --header 'Content-Type: application/json' \
+            --data-raw '{
+                "q": "Ranaau",
+                "fuzzy": false,
+                "searchCriteria": [
+                    {
+                        "searchType": "beforeTemporal",
+                        "field": "observationDateTime",
+                        "values": ["2025-05-02T09:15:27+05:30"]
+                    }
+                ],
+                "geoQ": {
+                    "geometry": "Point",
+                    "coordinates": [21.178, 72.834],
+                    "georel": "near;maxDistance=20",
+                    "geoproperty": "location"
+                }
+            }'
+
+  /ngsi-ld/v2/{id}/download:
+    get:
+      tags:
+        - Download CSV
+      summary: Get Data CSV
+      description: 'This is used to stream data in csv format for a given resource ID. (Get Search Data). Use same format of request data sample as it is in /entities/{id} API. Download uses the Elasticsearch <b>Scroll API</b> to
+        stream the <b>entire</b> matching result set in batches — it is <b>not</b> subject to the
+        50,000-record pagination limit. Use this endpoint to export large or full datasets.
+        <b>Temporal resources</b> can be scoped with <code>timeRel</code> + <code>time</code>/<code>endTime</code>.
+        <b>Non-temporal (ATTR) resources</b> have no time dimension; the GET form streams the full
+        attribute dataset (use POST for attribute/range filtering).'
+
+      operationId: downloadIdEntityData
+      security:
+        - authorization: [ ]
+        - appIdAuth: [ ]
+      parameters:
+        - name: did
+          in: header
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: id
+          in: path
+          required: true
+          description: 'A <b> valid data exchange ID </b> of the resource. <br/> Information about the data exchange ID of the resource and security scope of the resource can be obtained from the <b> DX(Data exchange) Controlplane server </b> .'
+          schema:
+            type: string
+            format: uuid
+
+        - name: sort
+          in: query
+          description: 'This parameter is used to sort the results basis on this property. <br/> The default sortBy property is `observationDateTime:desc` . <br/> The user could provide any property among `observationDateTime` and `itemCreatedAt` of the resource to sort the data. <br/> If the user provides a property which is not part of the resource, the API will throw a `400-Bad Request` error.'
+          required: false
+          schema:
+            type: string
+            enum: [ observationDateTime:desc, itemCreatedAt:desc, observationDateTime:asc, itemCreatedAt:asc ]
+      responses:
+        '200':
+          description: Success
+        '401':
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/standardInvalidTokenErrorResponse"
+          description: 'Unauthorized - Invalid/missing token'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenResponse'
+
+        '400':
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/invalidParamBadRequestErrorResponse"
+          description: 'Bad query - Empty response | Missing/Invalid parameters'
+        '404':
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/standardResourceNotFoundErrorResponse"
+          description: 'Resource not found'
+
+      x-codeSamples:
+        - lang: 'cURL'
+          label: 'get download data'
+          source: |
+            curl --location --request GET 'https://v2.dev.iudx.io/dataplane/ngsi-ld/v2/f29d4456-b712-4b96-af64-82916bffcb62/download?size=2&page=1&timeRel=during&time=2020-11-18T14:20:00Z&endTime=2020-12-28T14:20:00Z' \
+            --header 'Authorization: Bearer <tokenValue>'
+
+    post:
+      tags:
+        - Download CSV
+      summary: Post Data CSV
+      description: 'Streams a resource data as a <b>CSV file</b> using a request body with the unified
+        <code>searchCriteria</code> format (identical to the <code>/search</code> endpoint). Use this
+        for complex filtering — term, numeric range, temporal, geo, and text — beyond what the GET
+        form expresses.Like the GET form, this uses the Elasticsearch <b>Scroll API</b> and streams the entire
+        matching result set as CSV, with no 50,000-record limit.'
+      operationId: downloadPutSearchData
+      security:
+        - authorization: [ ]
+        - appIdAuth: [ ]
+      parameters:
+        - name: did
+          in: header
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: id
+          in: path
+          required: true
+          description: 'A <b> valid data exchange ID </b> of the resource. <br/> Information about the data exchange ID of the resource and security scope of the resource can be obtained from the <b> DX(Data exchange) Controlplane server </b> .'
+          schema:
+            type: string
+            format: uuid
+        - name: sort
+          in: query
+          description: >
+            This parameter allows sorting the results by up to 3 fields, separated by a semicolon (;).
+            The format for each field is `fieldName:asc` or `fieldName:desc`.
+            For example: `itemCreatedAt:desc;dataReadiness:asc;name:desc` will sort by creation date (descending),
+            then dataReadiness (ascending), then name (descending).
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+        '401':
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/standardInvalidTokenErrorResponse"
+          description: 'Unauthorized - Invalid/missing token'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenResponse'
+        '400':
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/invalidParamBadRequestErrorResponse"
+          description: 'Bad query - Empty response | Missing/Invalid parameters'
+        '404':
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/standardResourceNotFoundErrorResponse"
+          description: 'Resource not found'
+
+      x-codeSamples:
+        - lang: 'cURL'
+          label: 'post download data'
+          source: |
+            curl --location --request POST 'https://v2.dev.iudx.io/dataplane/ngsi-ld/v2/f29d4456-b712-4b96-af64-82916bffcb62/download' \
+            --header 'Authorization: Bearer <tokenValue>' \
+            --header 'Content-Type: application/json' \
+            --data-raw '{
+                "searchCriteria": [
+                    {
+                        "searchType": "beforeTemporal",
+                        "field": "observationDateTime",
+                        "values": ["2025-05-02T09:15:27+05:30"]
+                    }
+                ]
+            }'
+  /admin/elasticsearch/createIndex:
+    post:
+      tags:
+        - Admin
+      summary: Onboard dataset index into Elasticsearch
+      description: Creates an Elasticsearch index using provided `indexName` and `dataDescriptor` (mappings).
+      operationId: onboardElasticsearchIndex
+      security:
+        - authorization: [ ]
+      parameters:
+        - name: dynamic
+          in: query
+          required: false
+          description: >
+            How the new index treats fields the dataDescriptor does not declare.
+            `true` adds them to the mapping with a guessed type; `false` stores them
+            in _source but indexes nothing; `strict` rejects the whole document.
+          schema:
+            type: string
+            enum: [ "true", "false", "strict" ]
+            default: "strict"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - dataDescriptor
+              properties:
+                id:
+                  type: string
+                  description: Dataset ID; final index will be TENANT__ID
+                dataDescriptor:
+                  type: object
+                  properties:
+                    refNumber:
+                      type: object
+                      description: Elasticsearch index mappings object
+      responses:
+        '201':
+          description: Index created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  type:
+                    type: string
+                    example: dx:dataplane:success
+                  title:
+                    type: string
+                    example: Created
+                  detail:
+                    type: string
+                    example: Index created successfully
+        '409':
+          description: Index Already Exist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/generalResourceAlreadyExistErrorResponse'
+
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/standardBadRequestErrorResponse'
+
+components:
+  securitySchemes:
+    authorization:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Keycloak issued Bearer token
+    appIdAuth:
+      type: http
+      scheme: basic
+      description: Direct AppId authentication. Credentials as base64(appId:appSecret) in Authorization header.
+  schemas:
+    GeoSearchRequest:
+      type: object
+      additionalProperties: true
+      properties:
+        geoQ:
+          type: object
+          additionalProperties: false
+          properties:
+            geometry:
+              type: string
+              enum: [ point, Point, polygon, Polygon, LineString, linestring, bbox ]
+              default: ""
+              pattern: "^.*$"
+            coordinates:
+              anyOf:
+                - type: array
+                  maxItems: 2
+                  default: [ ]
+                  items:
+                    type: number
+                    default: 0.0
+                - type: array
+                  default: [ ]
+                  items:
+                    type: array
+                    default: [ ]
+                    items:
+                      type: array
+                      default: [ ]
+                      items:
+                        type: number
+                        default: 0.0
+                - type: array
+                  default: [ ]
+                  items:
+                    type: array
+                    default: [ ]
+                    items:
+                      type: number
+                      default: 0.0
+            georel:
+              type: string
+              minLength: 1
+              maxLength: 512
+              default: ""
+              pattern: "^.*$"
+            geoproperty:
+              type: string
+              enum: [ location ]
+              default: ""
+              pattern: "^.*$"
+    TextSearchRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        q:
+          type: string
+          description: The search query string.
+        fuzzy:
+          type: boolean
+          description: Enables fuzzy matching.
+        autoComplete:
+          type: boolean
+          description: Enables autocomplete suggestions.
+      required:
+        - q
+    AutocompleteFuzzyTextSearchRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        q:
+          type: string
+          description: The search query string for autocomplete.
+        fuzzy:
+          type: boolean
+          description: Enables fuzzy matching for the search query.
+        autoComplete:
+          type: boolean
+          description: Enables autocomplete suggestions.
+        filter:
+          type: array
+          items:
+            type: string
+          description: List of properties to include in the response (e.g., id, label, name, description, tags).
+      required:
+        - q
+      example:
+        q: "sat"
+        autoComplete: true
+        fuzzy: true
+        filter:
+          - "id"
+          - "label"
+          - "name"
+          - "description"
+          - "tags"
+    SearchCriteriaRequest:
+      type: object
+      additionalProperties: false   # (or true, if you prefer)
+      properties:
+        searchCriteria:
+          type: array
+          items:
+            $ref: '#/components/schemas/SearchCriteria'
+        filter:
+          type: array
+          items:
+            type: string
+          description: List of fields to return
+      required:
+        - searchCriteria
+    successResponseForSearchByItemType:
+      type: object
+      title: search by item type
+      properties:
+        type:
+          type: string
+          description: URN type of the response indicating if the query was successful or if any errors have been triggered.
+        title:
+          type: string
+          description: A human-readable title for the message response.
+        pagination:
+          type: object
+          description: Pagination metadata for the results.
+          properties:
+            page:
+              type: integer
+              description: Current page number.
+            size:
+              type: integer
+              description: Number of items per page.
+            totalCount:
+              type: integer
+              description: Total number of items across all pages.
+            totalPages:
+              type: integer
+              description: Total number of pages available.
+            hasNext:
+              type: boolean
+              description: Indicates if more pages are available.
+            hasPrevious:
+              type: boolean
+              description: Indicates if previous pages exist.
+          required:
+            - page
+            - size
+            - totalCount
+            - totalPages
+            - hasNext
+            - hasPrevious
+        result:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                description: Resource identifier.
+            required:
+              - id
+      required:
+        - type
+        - title
+        - pagination
+        - result
+      example:
+        type: "dx:dataplane:success"
+        title: "Success"
+        pagination:
+          page: 1
+          size: 100
+          totalCount: 3
+          totalPages: 1
+          hasNext: false
+          hasPrevious: false
+        result:
+          - id: "a4e3b98f-d073-4a2f-8587-e8d1718f2a89"
+          - id: "d7d34f8d-8cd4-4a68-8a4d-3b7fc5e8bb13"
+          - id: "2b1a2e8d-45f4-43a1-9e8e-d1f8ad1002bb"
+    adapterIngestionEntities:
+      title: ingestion
+      type: object
+      properties:
+        details:
+          description: Item Published
+      example:
+        detail: "Item Published"
+    ingestionEntityRequest:
+      title: ingestion entity
+      required:
+        - entities
+      type: array
+      properties:
+        entities:
+          type: array
+          items:
+            type: string
+      example:
+        [ {
+          "currentLevel": 1.16,
+          "referenceLevel": 15.9,
+          "measuredDistance": 14.74,
+          "entities": "695e222b-3fae-4325-8db0-3e29d01c4fc0",
+          "observationDateTime": "2020-09-22T18:30:00+05:30",
+          "deviceInfo": {
+            "deviceID": "FWR055"
+          }
+        } ]
+    ingestionEntityRequest2:
+      title: ingestion entity
+      type: array
+      example:
+        [ {
+          "currentLevel": 1.16,
+          "referenceLevel": 15.9,
+          "measuredDistance": 14.74,
+          "observationDateTime": "2020-09-22T18:30:00+05:30",
+          "deviceInfo": {
+            "deviceID": "FWR055"
+          }
+        } ]
+    successResponseForAutocompleteFuzzyTextSearch:
+      type: object
+      title: search by text
+      properties:
+        type:
+          type: string
+          description: URN type of the response indicating if the query was successful or if any errors have been triggered.
+        title:
+          type: string
+          description: A human-readable title for the message response.
+        pagination:
+          type: object
+          properties:
+            page:
+              type: integer
+              description: Current page number.
+            size:
+              type: integer
+              description: Number of items per page.
+            totalCount:
+              type: integer
+              description: Total number of items across all pages.
+            totalPages:
+              type: integer
+              description: Total number of pages.
+            hasNext:
+              type: boolean
+              description: Whether there is a next page.
+            hasPrevious:
+              type: boolean
+              description: Whether there is a previous page.
+          required:
+            - page
+            - size
+            - totalCount
+            - totalPages
+            - hasNext
+            - hasPrevious
+        result:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                description: Resource identifier.
+              label:
+                type: string
+                description: Label of the resource.
+              name:
+                type: string
+                description: Name of the resource.
+              description:
+                type: string
+                description: Description of the resource.
+              tags:
+                type: array
+                items:
+                  type: string
+                description: List of tags associated with the resource.
+            required:
+              - id
+              - label
+              - name
+              - description
+              - tags
+      required:
+        - type
+        - title
+        - pagination
+        - result
+      example:
+        type: "dx:dataplane:success"
+        title: "Success"
+        pagination:
+          page: 1
+          size: 100
+          totalCount: 5
+          totalPages: 1
+          hasNext: false
+          hasPrevious: false
+        result:
+          - id: "32cf54e7-be31-474c-ae4c-3d41e556dd2d"
+            label: "Satellite-Derived Geospatial Layers"
+            name: "satellite-derived-geospatial-layers"
+            description: "The Satellite-Derived Geospatial Layers dataset provides high-resolution satellite imagery and geospatial data..."
+            tags:
+              - "Satellite"
+              - "Geospatial"
+          - id: "9c0737d6-17df-484f-a7f8-aa472002eae5"
+            label: "Corporate Employee Performance Data"
+            name: "corporate-employee-performance-data"
+            description: "The Corporate Employee Performance Data set is a comprehensive collection of performance metrics, key performance indicators (KPIs)..."
+            tags:
+              - "Corporate"
+              - "HR Analytics"
+              - "Performance"
+          - id: "f7c3489d-6a58-44a2-97f6-2dbd49291b3b"
+            label: "AI-Based Traffic Congestion Prediction"
+            name: "AI-Based Traffic Congestion Prediction"
+            description: "The AI-Based Traffic Congestion Prediction tool is an advanced solution aimed at alleviating urban traffic issues..."
+            tags:
+              - "ai"
+              - "ml"
+              - "model"
+              - "aimodel"
+              - "mlmodel"
+              - "smart cities"
+              - "traffic"
+              - "congestion"
+              - "urban planning"
+              - "transportation"
+              - "optimization"
+          - id: "a4e2f75c-91b7-4b6e-9de1-78f6c9f84e63"
+            label: "AI-Powered High-Risk Pregnancy Detection"
+            name: "AI-Powered High-Risk Pregnancy Detection"
+            description: "The AI-Powered High-Risk Pregnancy Detection model leverages artificial intelligence to analyze antenatal records and identify pregnancies at high risk..."
+            tags:
+              - "ai"
+              - "ml"
+              - "model"
+              - "aimodel"
+              - "mlmodel"
+              - "ai-model"
+              - "ml-model"
+              - "machine learning"
+              - "pregnancy detection"
+              - "healthcare"
+              - "maternal health"
+              - "high-risk pregnancy"
+          - id: "2b1a2e8d-45f4-43a1-9e8e-d1f8ad1002bb"
+            label: "School Dropout Risk Prediction Model"
+            name: "school-dropout-risk-prediction-model"
+            description: "The School Dropout Risk Prediction Model is an advanced AI-powered tool designed to predict the likelihood of students dropping out of school..."
+            tags:
+              - "ai"
+              - "ml"
+              - "model"
+              - "aimodel"
+              - "mlmodel"
+              - "education"
+              - "risk prediction"
+              - "student analytics"
+    successResponseForRangeSearch:
+      type: object
+      title: Range search
+      properties:
+        type:
+          type: string
+          description: URN type of the response indicating if the query was successful or if any errors have been triggered
+        title:
+          type: string
+          description: A human-readable title for the message response
+        pagination:
+          type: object
+          description: Pagination metadata for the results
+          properties:
+            page:
+              type: integer
+              description: Current page number
+            size:
+              type: integer
+              description: Number of items per page
+            totalCount:
+              type: integer
+              description: Total number of items across all pages
+            totalPages:
+              type: integer
+              description: Total number of pages available
+            hasNext:
+              type: boolean
+              description: Indicates if more pages are available
+            hasPrevious:
+              type: boolean
+              description: Indicates if previous pages exist
+          required:
+            - page
+            - size
+            - totalCount
+            - totalPages
+            - hasNext
+            - hasPrevious
+        result:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                description: Resource identifier
+              tags:
+                type: array
+                items:
+                  type: string
+                description: List of tags associated with the resource
+              dataReadiness:
+                type: integer
+                description: Optional field indicating how ready the data is (if applicable)
+            required:
+              - id
+              - tags
+      required:
+        - type
+        - title
+        - pagination
+        - result
+      example:
+        type: "dx:dataplane:success"
+        title: "Success"
+        pagination:
+          page: 1
+          size: 25
+          totalCount: 5
+          totalPages: 1
+          hasNext: false
+          hasPrevious: false
+        result:
+          - id: "32cf54e7-be31-474c-ae4c-3d41e556dd2d"
+            tags:
+              - "Satellite"
+              - "Geospatial"
+          - id: "861bc29a-fca7-45b5-b4c8-5b07dc88a594"
+            tags:
+              - "Transport"
+              - "Network"
+          - id: "d09a4b85-3899-4bfc-93f4-430bba8aefb4"
+            tags:
+              - "Maternal Health"
+              - "Healthcare"
+              - "Community Health"
+          - id: "28653cd7-9715-47d5-b12b-9d725ecfcad0"
+            tags:
+              - "Transport"
+              - "Railway"
+          - id: "9c0737d6-17df-484f-a7f8-aa472002eae5"
+            tags:
+              - "Corporate"
+              - "HR Analytics"
+              - "Performance"
+            dataReadiness: 85
+    successResponseForTemporalSearch:
+      type: object
+      title: Temporal search
+      properties:
+        type:
+          type: string
+          description: URN type of the response indicating if the query was successful or if any errors have been triggered
+        title:
+          type: string
+          description: A human-readable title for the message response
+        pagination:
+          type: object
+          description: Pagination metadata for the result.
+          properties:
+            page:
+              type: integer
+              description: Current page number.
+            size:
+              type: integer
+              description: Number of items per page.
+            totalCount:
+              type: integer
+              description: Total number of items across all pages.
+            totalPages:
+              type: integer
+              description: Total number of pages available.
+            hasNext:
+              type: boolean
+              description: Indicates if more pages are available.
+            hasPrevious:
+              type: boolean
+              description: Indicates if previous pages exist.
+          required:
+            - page
+            - size
+            - totalCount
+            - totalPages
+            - hasNext
+            - hasPrevious
+        result:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                description: Resource identifier
+              tags:
+                type: array
+                items:
+                  type: string
+                description: List of tags associated with the resource
+              itemCreatedAt:
+                type: string
+                format: date-time
+                description: Item creation timestamp in ISO 8601 format
+            required:
+              - id
+              - tags
+              - itemCreatedAt
+      required:
+        - type
+        - title
+        - pagination
+        - result
+      example:
+        type: "dx:dataplane:success"
+        title: "Success"
+        pagination:
+          page: 1
+          size: 50
+          totalCount: 3
+          totalPages: 1
+          hasNext: false
+          hasPrevious: false
+        result:
+          - id: "a4e3b98f-d073-4a2f-8587-e8d1718f2a89"
+            tags:
+              - "ai"
+              - "ml"
+              - "model"
+              - "aimodel"
+              - "grievance classification"
+              - "telugu"
+              - "text classification"
+              - "machine learning"
+            itemCreatedAt: "2025-04-15T10:30:00Z"
+          - id: "d7d34f8d-8cd4-4a68-8a4d-3b7fc5e8bb13"
+            tags:
+              - "ai"
+              - "ml"
+              - "model"
+              - "aimodel"
+              - "mlmodel"
+              - "crop disease detection"
+              - "plant health"
+              - "agriculture"
+            itemCreatedAt: "2025-04-15T10:30:00Z"
+          - id: "2b1a2e8d-45f4-43a1-9e8e-d1f8ad1002bb"
+            tags:
+              - "ai"
+              - "ml"
+              - "model"
+              - "aimodel"
+              - "mlmodel"
+              - "education"
+              - "risk prediction"
+              - "student analytics"
+            itemCreatedAt: "2025-04-15T10:30:00Z"
+    successResponseForComplexSearch:
+      type: object
+      title: Complex search
+      properties:
+        type:
+          type: string
+          description: URN type of the response indicating if the query was successful or if any errors have been triggered
+        title:
+          type: string
+          description: A human-readable title for the message response
+        pagination:
+          type: object
+          description: Pagination metadata for the results
+          properties:
+            page:
+              type: integer
+              description: Current page number
+            size:
+              type: integer
+              description: Number of items per page
+            totalCount:
+              type: integer
+              description: Total number of items across all pages
+            totalPages:
+              type: integer
+              description: Total number of pages available
+            hasNext:
+              type: boolean
+              description: Indicates if more pages are available
+            hasPrevious:
+              type: boolean
+              description: Indicates if previous pages exist
+          required:
+            - page
+            - size
+            - totalCount
+            - totalPages
+            - hasNext
+            - hasPrevious
+        result:
+          type: array
+          items:
+            type: object
+            properties:
+              type:
+                type: array
+                items:
+                  type: string
+                description: List of resource types
+              id:
+                type: string
+                description: Resource identifier
+              department:
+                type: string
+                description: Department name
+              itemCreatedAt:
+                type: string
+                format: date-time
+                description: Item creation timestamp in ISO 8601 format
+            required:
+              - type
+              - id
+              - department
+              - itemCreatedAt
+      required:
+        - type
+        - title
+        - pagination
+        - result
+      example:
+        type: "dx:dataplane:success"
+        title: "Success"
+        pagination:
+          page: 1
+          size: 25
+          totalCount: 1
+          totalPages: 1
+          hasNext: false
+          hasPrevious: false
+        result:
+          - type:
+              - "adex:DataBank"
+            id: "32cf54e7-be31-474c-ae4c-3d41e556dd2d"
+            department: "Environment Forests Science and Technology"
+            itemCreatedAt: "2025-04-15T10:30:00Z"
+    errorResponseForDiscovery:
+      type: object
+      title: Root Type for Discovery APIs
+      description: 'Standard Error Response for the search, count and geo queries'
+      properties:
+        type:
+          type: string
+          description: |
+            Type of the response indicating if the query was successful or if any errors have been triggered.
+        title:
+          description: A human readable title to the message response.
+        detail:
+          type: string
+          description: Detailed description of the type or response
+      required:
+        - type
+      example:
+        type: <error urn>
+        title: <error title
+        detail: <error detail description>
+    SearchCriteria:
+      type: object
+      additionalProperties: false
+      required:
+        - field
+        - searchType
+        - values
+      properties:
+        field:
+          type: string
+          description: Name of the property to filter.
+        searchType:
+          type: string
+          enum:
+            - term
+            - betweenTemporal
+            - beforeTemporal
+            - afterTemporal
+            - betweenRange
+            - beforeRange
+            - afterRange
+          description: |
+            Type of search to apply. Valid types:
+            - term: Property match
+            - betweenTemporal: ISO datetime range
+            - beforeTemporal: Before datetime
+            - afterTemporal: After datetime
+            - betweenRange: Numeric range
+            - beforeRange: Less than value
+            - afterRange: Greater than value
+        values:
+          type: array
+          items:
+            oneOf:
+              - type: string
+              - type: number
+          description: |
+            Values for the selected `searchType`. Required value format:
+            - `term`: One or more strings
+            - `betweenTemporal`: Two ISO date-time strings
+            - `beforeTemporal` / `afterTemporal`: One ISO date-time string
+            - `betweenRange`: Two numbers
+            - `beforeRange` / `afterRange`: One number
+    ComplexSearchRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        q:
+          type: string
+          description: The search query string.
+        fuzzy:
+          type: boolean
+          description: Enables fuzzy matching.
+        autoComplete:
+          type: boolean
+          description: Enables autocomplete suggestions.
+        searchCriteria:
+          type: array
+          items:
+            $ref: '#/components/schemas/SearchCriteria'
+          description: List of property-based search criteria.
+      required:
+        - q
+        - searchCriteria
+    createastreamingsubscriptionrequest:
+      title: createastreamingsubscriptionrequest
+      required:
+        - name
+        - type
+        - entities
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 512
+        type:
+          type: string
+          enum: [ subscription ]
+
+        entities:
+          type: array
+          minItems: 1
+          maxItems: 5
+          items:
+            type: string
+            format: uuid
+            maxLength: 36
+            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+          description: ''
+      example:
+        name: alias-name-of-application
+        type: subscription
+        entities:
+          - UUID
+    appendstreamingsubscriptionrequest:
+      title: appendstreamingsubscriptionrequest
+      required:
+        - name
+        - type
+        - entities
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 512
+
+        type:
+          type: string
+          enum: [ subscription ]
+
+        entities:
+          type: array
+          minItems: 1
+          maxItems: 5
+
+          items:
+            type: string
+          description: ''
+      example:
+        name: alias-name-of-application
+        type: subscription
+        entities:
+          - UUID
+    updatestreamingsubscriptionrequest:
+      title: updatestreamingsubscriptionrequest
+      required:
+        - name
+        - type
+        - entities
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 512
+
+        type:
+          type: string
+          enum: [ subscription ]
+
+        entities:
+          type: array
+          minItems: 1
+          maxItems: 5
+
+          items:
+            type: string
+          description: ''
+      example:
+        name: alias-name-of-application
+        type: subscription
+        entities:
+          - UUID
+    geospatial-circlerequest:
+      title: geospatial-circlerequest
+      required:
+        - type
+        - entities
+      type: object
+      properties:
+        type:
+          type: string
+        entities:
+          type: array
+          items:
+            $ref: '#/components/schemas/Entity'
+          description: ''
+        geoQ:
+          $ref: '#/components/schemas/GeoQ'
+      example:
+        type: Query
+        entities:
+          - id: 9c0737d6-17df-484f-a7f8-aa472002eae5
+        geoQ:
+          geometry: Point
+          coordinates:
+            - 25.319768
+            - 82.987988000000001
+          georel: near;maxDistance=1000
+          geoproperty: geoJsonLocation
+    Entity:
+      title: Entity
+      required:
+        - id
+      type: object
+      properties:
+        id:
+          type: string
+          maxLength: 512
+          description: 'A <b> valid data exchange ID </b> of the resource.  <br/> If the resource is a <b> protected resource </b> a <b> valid data exchange Auth token </b> is <b> mandatory </b>  in the header parameter of the request.  <br/> Information about the data exchange ID of the resource and security scope of the resource can be obtained from the <b> DX(Data exchange) catalogue server </b> .'
+      example:
+        id: 9c0737d6-17df-484f-a7f8-aa472002eae5
+    GeoQ:
+      title: GeoQ
+      required:
+        - geometry
+        - coordinates
+        - georel
+        - geoproperty
+      additionalProperties: false
+      type: object
+      properties:
+        geometry:
+          type: string
+          enum: [ Point, point, Polygon, polygon, bbox, LineString, linestring ]
+          description: >
+            The geometry type of <b>geoquery</b> to be performed. <br/>
+            This <b>should</b> be one from the available options in the Enum list. <br/>
+            The list is <b>case sensitive</b>.
+        coordinates:
+          oneOf:
+            - type: array
+              minItems: 2
+              maxItems: 2
+              items:
+                type: number
+              description: >
+                Used for geometry type <b>Point</b>. Represents a single longitude, latitude pair.
+            - type: array
+              minItems: 2
+              maxItems: 10
+              items:
+                type: array
+                minItems: 2
+                maxItems: 2
+                items:
+                  type: number
+              description: >
+                Used for geometry types <b>LineString</b> and <b>bbox</b>. Each sub-array is a longitude, latitude pair.
+            - type: array
+              minItems: 1
+              maxItems: 1
+              items:
+                type: array
+                minItems: 4
+                maxItems: 10
+                items:
+                  type: array
+                  minItems: 2
+                  maxItems: 2
+                  items:
+                    type: number
+              description: >
+                Used for geometry type <b>Polygon</b>. A single polygon defined as an array of linear ring coordinates.
+
+        georel:
+          type: string
+          #          enum: [ near, within, intersects ]
+          description: 'The relation type of <b>geoquery</b> to be performed. <br/> This <b>should</b> be one from the available options in the Enum list. <br/> The relation <b> near </b> should be always accomodated with a <b> maxdistance </b> property. <br/> Apart from <b> maxdistance</b> , all other fields in the Enum list are <b> case sensitive </b> fields. <br/> The relation <b> near;maxdistance </b> is applicable only for a <b> point </b>.  <br/> The relation <b> within </b> and  <b> intersects </b> are applicable only for <b> bbox, polygon and linestring</b>.'
+        geoproperty:
+          type: string
+          enum: [ location ]
+          description: 'Name of the <b> geospatial </b> property in the <b> DX(Data exchange) data descriptor </b>. <br /> The current version of the API <b> mandates </b> it to be equal to `location`'
+      example:
+        geometry: Point
+        coordinates:
+          - 25.319768
+          - 82.987988000000001
+        georel: near;maxDistance=1000
+        geoproperty: geoJsonLocation
+    geospatial-circlecount-request:
+      title: geospatial-circle(count)request
+      required:
+        - type
+        - entities
+        - options
+      type: object
+      properties:
+        type:
+          type: string
+        entities:
+          type: array
+          items:
+            $ref: '#/components/schemas/Entity'
+          description: ''
+        geoQ:
+          $ref: '#/components/schemas/GeoQ'
+        options:
+          type: string
+      example:
+        type: Query
+        entities:
+          - id: 9c0737d6-17df-484f-a7f8-aa472002eae5
+        geoQ:
+          geometry: Point
+          coordinates:
+            - 25.319768
+            - 82.987988000000001
+          georel: near;maxDistance=100
+          geoproperty: geoJsonLocation
+        options: count
+    geospatial-polygonrequest:
+      title: geospatial-polygonrequest
+      required:
+        - type
+        - entities
+      type: object
+      properties:
+        type:
+          type: string
+        entities:
+          type: array
+          items:
+            $ref: '#/components/schemas/Entity'
+          description: ''
+        geoQ:
+          $ref: '#/components/schemas/GeoQ2'
+    GeoQ2:
+      title: GeoQ2
+      required:
+        - geometry
+        - coordinates
+        - georel
+        - geoproperty
+      type: object
+      properties:
+        geometry:
+          type: string
+        coordinates:
+          type: array
+          items:
+            type: array
+            items:
+              type: number
+        georel:
+          type: string
+        geoproperty:
+          type: string
+    geospatial-linestringrequest:
+      title: geospatial-linestringrequest
+      required:
+        - type
+        - entities
+        - geoQ
+      type: object
+      properties:
+        type:
+          type: string
+        entities:
+          type: array
+          items:
+            $ref: '#/components/schemas/Entity'
+          description: ''
+        geoQ:
+          $ref: '#/components/schemas/GeoQ2'
+      example:
+        type: Query
+        entities:
+          - id: 9c0737d6-17df-484f-a7f8-aa472002eae5
+        geoQ:
+          geometry: linestring
+          coordinates:
+            - - 82.973500000000001
+              - 25.3352
+            - - 82.989400000000003
+              - 25.345199999999998
+            - - 82.989999999999995
+              - 25.34
+          georel: intersects
+          geoproperty: geoJsonLocation
+    geospatial-bboxrequest:
+      title: geospatial-bboxrequest
+      required:
+        - type
+        - entities
+        - geoQ
+      type: object
+      properties:
+        type:
+          type: string
+        entities:
+          type: array
+          items:
+            $ref: '#/components/schemas/Entity'
+          description: ''
+        geoQ:
+          $ref: '#/components/schemas/GeoQ2'
+      example:
+        type: Query
+        entities:
+          - id: 9c0737d6-17df-484f-a7f8-aa472002eae5
+        geoQ:
+          geometry: bbox
+          coordinates:
+            - - 82.950000000000003
+              - 25.3567
+            - - 83.005300000000005
+              - 25
+          georel: within
+          geoproperty: geoJsonLocation
+    responsefilterrequest:
+      title: responsefilterrequest
+      required:
+        - type
+        - entities
+        - attrs
+      type: object
+      properties:
+        type:
+          type: string
+        entities:
+          type: array
+          items:
+            $ref: '#/components/schemas/Entity'
+          description: ''
+        attrs:
+          type: string
+      example:
+        type: Query
+        entities:
+          - id: 9c0737d6-17df-484f-a7f8-aa472002eae5
+        attrs: resource-id,latitude,longitude
+    geospatial-circle-responsefilterrequest:
+      title: geospatial-circle+responsefilterrequest
+      required:
+        - type
+        - entities
+        - geoQ
+        - attrs
+      type: object
+      properties:
+        type:
+          type: string
+        entities:
+          type: array
+          items:
+            $ref: '#/components/schemas/Entity'
+          description: ''
+        geoQ:
+          $ref: '#/components/schemas/GeoQ'
+        attrs:
+          type: string
+      example:
+        type: Query
+        entities:
+          - id: 9c0737d6-17df-484f-a7f8-aa472002eae5
+        geoQ:
+          geometry: Point
+          coordinates:
+            - 25.319768
+            - 82.987988000000001
+          georel: near;maxDistance=1000
+          geoproperty: geoJsonLocation
+        attrs: resource-id,longitude,latitude
+    temporal-betweenrequest:
+      title: temporal-betweenrequest
+      required:
+        - type
+        - entities
+      type: object
+      properties:
+        type:
+          type: string
+        entities:
+          type: array
+          items:
+            $ref: '#/components/schemas/Entity'
+          description: ''
+      example:
+        type: Query
+        entities:
+          - id: 9c0737d6-17df-484f-a7f8-aa472002eae5
+        temporalQ:
+          timerel: between
+          time: 2020-06-01T14:20:00Z
+          endtime: 2020-06-03T15:00:00Z
+          timeProperty: timeProperty
+    TemporalQ:
+      title: TemporalQ
+      required:
+        - timerel
+        - timeAt
+      additionalProperties: false
+      type: object
+      properties:
+        timerel:
+          type: string
+          enum: [ between, before, after ]
+          description: 'The temporal relation type of <b>timerel</b> to be performed. <br/> This <b>should</b> be one from the available options in the Enum list. <br/> If the relation is <b> between </b> it should be always accomodated with a <b> time </b> and <b> endtime </b> property.  <br/> If the relation is <b> before </b> or <b> after </b>it should be always accomodated <b> only</b> with a <b> time </b> property.'
+        timeAt:
+          type: string
+          description: 'This parameter specifies the <b>start time</b> for the temporal-query in `ISO8601` format. <br/> data exchange currently accepts `IST` and `UTC` time zones for the temporal query.'
+        endTimeAt:
+          type: string
+          description: 'This parameter specifies the <b>end time</b> for the temporal-query in `ISO8601` format. <br/> data exchange currently accepts `IST` and `UTC` time zones for the temporal query. <br/>If <b>timerel</b> is `between` time and endtime are mandatory'
+        timeproperty:
+          type: string
+          enum: [ observationDateTime, observedAt ]
+      example:
+        timerel: between
+        timeAt: 2020-06-01T14:20:00Z
+        endTimeAt: 2020-06-03T15:00:00Z
+        timeproperty: observationDateTime
+    time-beforerequest:
+      title: time-beforerequest
+      required:
+        - type
+        - entities
+        - temporalQ
+      type: object
+      properties:
+        type:
+          type: string
+        entities:
+          type: array
+          items:
+            $ref: '#/components/schemas/Entity'
+          description: ''
+        temporalQ:
+          $ref: '#/components/schemas/TemporalQ1'
+      example:
+        type: Query
+        entities:
+          - id: 9c0737d6-17df-484f-a7f8-aa472002eae5
+        temporalQ:
+          timerel: before
+          time: 2020-06-01T14:20:00Z
+          timeProperty: timeProperty
+    TemporalQ1:
+      title: TemporalQ1
+      required:
+        - timerel
+        - time
+        - timeProperty
+      type: object
+      properties:
+        timerel:
+          type: string
+        time:
+          type: string
+        timeProperty:
+          type: string
+      example:
+        timerel: before
+        time: 2020-06-01T14:20:00Z
+        timeProperty: timeProperty
+    complex-temporal-geo:
+      title: complex-geo+time+filterrequest
+      required:
+        - type
+        - entities
+        - temporalQ
+      additionalProperties: false
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [ Query ]
+        entities:
+          type: array
+          items:
+            $ref: '#/components/schemas/Entity'
+          description: ''
+        geoQ:
+          $ref: '#/components/schemas/GeoQ'
+        temporalQ:
+          $ref: '#/components/schemas/TemporalQ'
+        orderBy:
+          type: string
+          maxLength: 512
+          description: Comma-separated list of properties to orderBy from the response. By default it is `desc`, when it is given only. Could be used with `asc` or `desc` keyword. E.g., `observation:desc,speed:asc`, or `observation,speed:asc`, or `observation:desc,speed`, or `observation,speed`
+        q:
+          type: string
+          maxLength: 512
+          description: 'The attribute query is used for querying <b> allowed quantitative</b> properties. <br/> Used to query on a value of a resource attribute using `<`,`>`,`<=`,`>=`,`!=`, `==` operators. <br/> For e.g, attribute > value, attribute < value, attribute >= value, attribute <= value, attribute != value and attribute == value. <br/> Allowed values for all operators is double. <br/> For the operator `==` if the query is on `id` then the only value allowed is an `data exchange ID` of a resource.'
+        omit:
+          type: string
+          maxLength: 512
+          description: 'The omit is used as an <b>omit filter</b>. <br/> This is an optional parameter. It can be used to provide the omit of attributes which the consumer expects to be avoided by the server. <br/> The consumer is expected to provide <b>only</b> the attributes available in the <b>data descriptor</b> of the item in the DX(Data exchange) Catalogue. <br/> Minimum of 1 and a Maximum of 5 attributes can be provided in a comma separated fashion.'
+        pick:
+          type: string
+          maxLength: 512
+          description: 'The pick is used as an <b>pick filter</b>. <br/> This is an optional parameter. It can be used to provide the pick of attributes which the consumer expects to be responded by the server. <br/> The consumer is expected to provide <b>only</b> the attributes available in the <b>data descriptor</b> of the item in the DX(Data exchange) Catalogue. <br/> Minimum of 1 and a Maximum of 5 attributes can be provided in a comma separated fashion.'
+      example:
+        type: Query
+        entities:
+          - id: 9c0737d6-17df-484f-a7f8-aa472002eae5
+        geoQ:
+          geometry: Point
+          coordinates:
+            - 25.319768
+            - 82.987988000000001
+          georel: near;maxDistance=1000
+          geoproperty: geoJsonLocation
+        temporalQ:
+          timerel: between
+          timeAt: 2020-06-01T14:20:00Z
+          endTimeAt: 2020-06-03T15:00:00Z
+          timeproperty: observationDateTime
+
+    complex-entities-geo:
+      title: complex-geo+attribute+filterrequest
+      required:
+        - type
+        - entities
+      additionalProperties: false
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [ Query ]
+        entities:
+          type: array
+          items:
+            $ref: '#/components/schemas/Entity'
+          description: ''
+        geoQ:
+          $ref: '#/components/schemas/GeoQ'
+        orderBy:
+          type: string
+          maxLength: 512
+          description: Comma-separated list of properties to orderBy from the response. By default it is `desc`, when it is given only. Could be used with `asc` or `desc` keyword. E.g., `observation:desc,speed:asc`, or `observation,speed:asc`, or `observation:desc,speed`, or `observation,speed`
+        q:
+          type: string
+          maxLength: 512
+          description: 'The attribute query is used for querying <b> allowed quantitative</b> properties. <br/> Used to query on a value of a resource attribute using `<`,`>`,`<=`,`>=`,`!=`, `==` operators. <br/> For e.g, attribute > value, attribute < value, attribute >= value, attribute <= value, attribute != value and attribute == value. <br/> Allowed values for all operators is double. <br/> For the operator `==` if the query is on `id` then the only value allowed is an `data exchange ID` of a resource.'
+        omit:
+          type: string
+          maxLength: 512
+          description: 'The omit is used as an <b>omit filter</b>. <br/> This is an optional parameter. It can be used to provide the omit of attributes which the consumer expects to be avoided by the server. <br/> The consumer is expected to provide <b>only</b> the attributes available in the <b>data descriptor</b> of the item in the DX(Data exchange) Catalogue. <br/> Minimum of 1 and a Maximum of 5 attributes can be provided in a comma separated fashion.'
+        pick:
+          type: string
+          maxLength: 512
+          description: 'The pick is used as an <b>pick filter</b>. <br/> This is an optional parameter. It can be used to provide the pick of attributes which the consumer expects to be responded by the server. <br/> The consumer is expected to provide <b>only</b> the attributes available in the <b>data descriptor</b> of the item in the DX(Data exchange) Catalogue. <br/> Minimum of 1 and a Maximum of 5 attributes can be provided in a comma separated fashion.'
+      example:
+        type: Query
+        entities:
+          - id: 32cf54e7-be31-474c-ae4c-3d41e556dd2d
+        geoQ:
+          geometry: Point
+          coordinates:
+            - 25.319768
+            - 82.987988000000001
+          georel: near;maxDistance=1000
+          geoproperty: geoJsonLocation
+
+
+    entityresponse:
+      title: entityresponse
+      type: object
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        result:
+          description: An array of objects
+          type: array
+          items:
+            type: object
+        paginationInfo:
+          type: object
+          properties:
+            page:
+              type: integer
+            size:
+              type: integer
+            totalCount:
+              type: integer
+            totalPages:
+              type: integer
+            hasNext:
+              type: boolean
+            hasPrevious:
+              type: boolean
+      example:
+        type: "dx:dataplane:success"
+        title: "Success"
+        result:
+          - trip_direction: "NT"
+            trip_id: "24374871"
+            route_id: "17AD"
+            trip_delay: 948
+            last_stop_arrival_time: "15:09:58"
+            actual_trip_start_time: "2020-11-03T14:22:30+05:30"
+            vehicle_label: "A09"
+            observationDateTime: "2020-11-03T15:12:08+05:30"
+            speed: 25.0
+            license_plate: "GJ05BX1916"
+            last_stop_id: "2028"
+            location:
+              coordinates:
+                - 72.870511
+                - 21.218943
+              type: "Point"
+            id: "UUID"
+        paginationInfo:
+          page: 1
+          size: 100
+          totalCount: 1
+          totalPages: 1
+          hasNext: false
+          hasPrevious: false
+
+    temporalEntityresponse:
+      title: temporalentityresponse
+      type: object
+      properties:
+        result:
+          description: An array of objects
+          type: array
+          items:
+            type: object
+      example:
+        [
+          {
+            "trip_direction": "NT",
+            "trip_id": "24374871",
+            "route_id": "17AD",
+            "trip_delay": 948,
+            "last_stop_arrival_time": "15:09:58",
+            "actual_trip_start_time": "2020-11-03T14:22:30+05:30",
+            "vehicle_label": "A09",
+            "observationDateTime": "2020-11-03T15:12:08+05:30",
+            "speed": 25.0,
+            "license_plate": "GJ05BX1916",
+            "last_stop_id": "2028",
+            "location": {
+              "coordinates": [
+                72.870511,
+                21.218943
+              ],
+              "type": "Point"
+            },
+            "id": "UUID"
+          }
+        ]
+    temporalEntityresponse2:
+      title: temporalentityresponse2
+      type: object
+      properties:
+        result:
+          description: An array of objects
+          type: array
+          items:
+            type: object
+      example:
+        [
+          {
+            "@context": "<Link to explain json+ld> example: https://schema.org/context.jsonld",
+            "trip_direction": "NT",
+            "trip_id": "24374871",
+            "route_id": "17AD",
+            "trip_delay": 948,
+            "last_stop_arrival_time": "15:09:58",
+            "actual_trip_start_time": "2020-11-03T14:22:30+05:30",
+            "vehicle_label": "A09",
+            "observationDateTime": "2020-11-03T15:12:08+05:30",
+            "speed": 25.0,
+            "license_plate": "GJ05BX1916",
+            "last_stop_id": "2028",
+            "location": {
+              "coordinates": [
+                72.870511,
+                21.218943
+              ],
+              "type": "Point"
+            },
+            "id": "UUID"
+          }
+        ]
+    NgsiLdSubscriptionErrorResponse400:
+      title: NgsiLdSubscriptionErrorResponse400
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        detail:
+          type: string
+        instance:
+          type: string
+      example:
+        type: "dx:dataplane:badRequest"
+        title: "Bad Request"
+        detail: "string"
+        instance: "string"
+    NgsiLdSubscriptionErrorResponse413:
+      title: NgsiLdSubscriptionErrorResponse413
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        detail:
+          type: string
+        instance:
+          type: string
+    NgsiLdSubscriptionErrorResponse404:
+      title: NgsiLdSubscriptionErrorResponse404
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        detail:
+          type: string
+        instance:
+          type: string
+      example:
+        type: "dx:dataplane:notFound"
+        title: "Not Found"
+        detail: "doc doesn't exist / Not Found"
+        instance: "string"
+    NgsiLdSubscriptionErrorResponse401:
+      title: NgsiLdSubscriptionErrorResponse401
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        detail:
+          type: string
+        instance:
+          type: string
+      example:
+        type: "dx:dataplane:notAuthorized"
+        title: "Not Authorized"
+        detail: "Not Authorized / Invalid token / missing Bearer token / Missing credentials"
+        instance: "string"
+
+    NgsiLdSubscriptionErrorResponse409:
+      title: NgsiLdSubscriptionErrorResponse409
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        detail:
+          type: string
+        instance:
+          type: string
+
+    NgsiLdSubscriptionErrorResponse500:
+      title: NgsiLdSubscriptionErrorResponse500
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        detail:
+          type: string
+        instance:
+          type: string
+    spatialAttributeEntityresponse:
+      title: spatialAttributeEntityresponse
+      type: object
+      properties:
+        result:
+          description: An array of objects
+          type: array
+          items:
+            type: object
+      example:
+        [
+          {
+            "trip_direction": "NT",
+            "trip_id": "24374871",
+            "route_id": "17AD",
+            "vehicle_label": "A09",
+            "speed": 25.0,
+            "license_plate": "GJ05BX1916",
+            "last_stop_id": "2028",
+            "location": {
+              "coordinates": [
+                72.870511,
+                21.218943
+              ],
+              "type": "Point"
+            },
+            "id": "UUID"
+          }
+        ]
+
+    spatialAttributeEntityresponse2:
+      title: spatialAttributeEntityresponse2
+      type: object
+      properties:
+        result:
+          description: An array of objects
+          type: array
+          items:
+            type: object
+      example:
+        [
+          {
+            "@context": "<Link to explain json+ld> example: https://schema.org/context.jsonld",
+            "trip_direction": "NT",
+            "trip_id": "24374871",
+            "route_id": "17AD",
+            "vehicle_label": "A09",
+            "speed": 25.0,
+            "license_plate": "GJ05BX1916",
+            "last_stop_id": "2028",
+            "location": {
+              "coordinates": [
+                72.870511,
+                21.218943
+              ],
+              "type": "Point"
+            },
+            "id": "UUID"
+          }
+        ]
+    countResponse:
+      title: Count response
+      type: object
+      properties:
+        result:
+          description: An objects
+          type: object
+          items:
+            type: object
+      example:
+        {
+          "type": "CountResult",
+          "value": 145
+        }
+
+    registeradapter:
+      title: registeradapter
+      required:
+        - username
+        - apiKey
+        - id
+        - URL
+        - port
+        - vHost
+      type: object
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+
+    createstreaming:
+      title: createstreaming
+      required:
+        - username
+        - apiKey
+        - id
+        - URL
+        - port
+        - vHost
+      type: object
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        result:
+          description: An array of objects
+          type: array
+          items:
+            type: object
+
+      example:
+        type: dx:dataplane:success,
+        title: success,
+        result: [
+          {
+            "username": "fd47486b-XXXX-XXXX-ac1e-082e4d37a66c",
+            "apiKey": "Use the apiKey returned on registration, if lost please use /resetPassword API",
+            "id": "fd47486b-XXXX-XXXX-ac1e-082e4d37a66c/RS-integration-test-alias-RL009",
+            "URL": "databroker.iudx.io",
+            "port": 24567,
+            "vHost": "IUDX"
+          }
+        ]
+
+
+
+    retrievestreaming:
+      title: retrievestreaming
+      required:
+        - entities
+      type: object
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        result:
+          description: An array of objects
+          type: array
+          items:
+            type: object
+      example:
+        type: dx:dataplane:success,
+        title: success,
+        result: [
+          { "entities": [ "UUID/.*" ]
+          }
+        ]
+
+    appendstreaming:
+      title: appendstreaming
+      required:
+        - entities
+      type: object
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        result:
+          description: An array of objects
+          type: array
+          items:
+            type: object
+      example:
+        type: dx:dataplane:success,
+        title: success,
+        result: [
+          { "entities": [ "UUID" ]
+          }
+        ]
+
+    updatestreaming:
+      title: updatestreaming
+      required:
+        - entities
+      type: object
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        result:
+          description: An array of objects
+          type: array
+          items:
+            type: object
+      example:
+        type: dx:dataplane:success,
+        title: success,
+        result: [
+          { "entities": [ "UUID" ]
+          }
+        ]
+
+    deletestreaming:
+      title: deletestreaming
+      type: object
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        detail:
+          type: string
+      example:
+        type: dx:dataplane:success
+        title: success
+        detail: Subscription deleted Successfully
+
+    resetpassword:
+      title: resetpassword
+      required:
+        - apiKey
+      type: object
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        result:
+          description: An array of objects
+          type: array
+          items:
+            type: object
+      example:
+        type: dx:dataplane:success
+        title: successful
+        result: [
+          { "username": "asasdasd-asdasd-aada-d23342",
+            "apiKey": "asass8a7s"
+          }
+        ]
+
+    asyncsearchResponse:
+      title: asyncsearch
+      type: object
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        result:
+          description: An array of objects
+          type: array
+          items:
+            type: object
+      example:
+        type: dx:dataplane:success
+        title: query submitted successfully
+        result: [
+          { "searchId": "asasdasd-asdasd-a353f-dasdas5"
+          }
+        ]
+
+    asyncsearchStatusComplete:
+      title: complete
+      type: object
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        result:
+          description: An array of objects
+          type: array
+          items:
+            type: object
+      example:
+        type: dx:dataplane:success
+        title: success
+        result: [
+          { "status": "COMPLETE",
+            "progress": 100.00,
+            "file-download-url": "https://example.com/filename",
+            "searchId": "asasdasd-asdasd-aasasd-dasdasd",
+            "userId": "aefvsdfsdf-exvsf-cezxcwscs-adasd"
+          }
+        ]
+
+    asyncsearchStatusInprogress:
+      title: inprogress
+      type: object
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        result:
+          description: An array of objects
+          type: array
+          items:
+            type: object
+      example:
+        type: dx:dataplane:success
+        title: success
+        result: [
+          { "status": "IN_PROGRESS",
+            "progress": 70.00,
+            "searchId": "asasdasd-asdasd-aasasd-dasdasd",
+            "userId": "aefvsdfsdf-exvsf-cezxcwscs-adasd"
+          }
+        ]
+
+
+    revokeToken:
+      title: revoke-token
+      required:
+        - sub
+      type: object
+      properties:
+        sub:
+          type: string
+      example:
+        sub: ase2132-2342323-2423
+
+
+    standardSuccessResponse:
+      title: standardSuccessResponse
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        detail:
+          type: string
+      example:
+        type: dx:dataplane:success
+        title: Success
+        detail: Success
+
+    invalidParamBadRequestErrorResponse:
+      title: invalidParamBadRequestErrorResponse
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        detail:
+          type: string
+      example:
+        type: dx:dataplane:badRequest
+        title: Bad Request
+        detail: Bad Request / Invalid path parameter 'id:' does not match the required format
+
+    invalidParamBadRequestErrorResponseLatestGet:
+      title: invalidParamBadRequestErrorResponseLatestGet
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        detail:
+          type: string
+      example:
+        type: dx:dataplane:badRequest
+        title: Bad Request
+        detail: Bad Request / Missing or malformed request / Invalid path parameter 'id:' does not match the required format
+
+    subscriptionInvalidParamBadRequestErrorResponse:
+      title: subscriptionInvalidParamBadRequestErrorResponse
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        detail:
+          type: string
+      example:
+        type: dx:dataplane:invalidParameter
+        title: Bad Request
+        detail: Invalid Name
+
+    entitiesInvalidParamBadRequestErrorResponse:
+      title: entitiesInvalidParamBadRequestErrorResponse
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        detail:
+          type: string
+      example:
+        type: dx:dataplane:invalidParameterValue
+        title: Bad Request
+        detail: Bad query
+
+    asyncSearchStatusInvalidParamResponse:
+      title: asyncSearchStatusInvalidParamResponse
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        detail:
+          type: string
+      example:
+        type: dx:dataplane:invalidParameterValue
+        title: Bad Request
+        detail: Bad Request
+
+    asyncSearchStatusIncorrectSearchIdResponse:
+      title: asyncSearchStatusIncorrectSearchIdResponse
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        detail:
+          type: string
+      example:
+        type: dx:dataplane:general
+        title: Bad Request
+        detail: "Fail: Incorrect search ID"
+
+    invalidPayloadFormatErrorResponse:
+      title: invalidPayloadFormatErrorResponse
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        detail:
+          type: string
+      example:
+        type: dx:dataplane:invalidPayloadFormat
+        title: Bad Request
+        detail: Bad Request
+
+    invalidParamsErrorResponse:
+      title: invalidParamsErrorResponse
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        detail:
+          type: string
+      example:
+        type: dx:dataplane:invalidTemporalRelationParam
+        title: Bad Request
+        detail: Bad Request
+
+    invalidDateFormatErrorResponse:
+      title: invalidDateFormatErrorResponse
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        detail:
+          type: string
+      example:
+        type: dx:dataplane:invalidAttributeValue
+        title: Bad Request
+        detail: Bad Request
+
+    asyncBadRequestErrorResponse:
+      title: asyncBadRequestErrorResponse
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        detail:
+          type: string
+      example:
+        type: dx:dataplane:badRequest
+        title: Bad Request
+        detail: Bad Request
+
+    standardBadRequestErrorResponse:
+      title: standardBadRequestErrorResponse
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        detail:
+          type: string
+      example:
+        type: dx:dataplane:badRequest
+        title: Bad Request Data
+        detail: Empty response | Missing/Invalid temporal parameters | Missing/Invalid geo parameters | Count is not supported with filtering
+
+    standardInvalidTokenErrorResponse:
+      title: standardInvalidTokenErrorResponse
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        detail:
+          type: string
+      example:
+        type: dx:dataplane:notAuthorized
+        title: Not Authorized
+        detail: Not Authorized / Invalid token / missing Bearer token / Missing credentials
+
+    generalResourceNotFoundErrorResponse:
+      title: generalResourceNotFoundErrorResponse
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        detail:
+          type: string
+      example:
+        type: dx:dataplane:general
+        title: Not Found
+        detail: Not Found / doc doesn't exist
+
+    standardResourceNotFoundErrorResponse:
+      title: standardResourceNotFoundErrorResponse
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        detail:
+          type: string
+      example:
+        type: dx:dataplane:notFound
+        title: Not Found
+        detail: Not Found / doc doesn't exist
+
+    resourceNotFoundErrorResponse:
+      title: resourceNotFoundErrorResponse
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        detail:
+          type: string
+      example:
+        type: dx:dataplane:resourceNotFound
+        title: Not Found
+        detail: Resource Not Found
+
+    generalResourceAlreadyExistErrorResponse:
+      title: generalResourceAlreadyExistErrorResponse
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        detail:
+          type: string
+      example:
+        type: dx:dataplane:general
+        title: Conflict
+        detail: Conflict
+
+    standardResourceAlreadyExistErrorResponse:
+      title: standardResourceAlreadyExistErrorResponse
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        detail:
+          type: string
+      example:
+        type: dx:dataplane:resourceAlreadyExist
+        title: Conflict
+        detail: Conflict
+
+    allqueue:
+      title: Response
+      required:
+        - type
+        - title
+        - details
+      type: object
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        result:
+          type: object
+          properties:
+            Subscription:
+              type: object
+      example:
+        type: dx:dataplane:success
+        title: success
+        result: [
+          {
+            "queuename": "fd47486b-XXXX-XXXX-ac1e-082e4d37a66c/RS-integration-test-alias-RL",
+            "entity": "UUID",
+            "catitem": {
+              "name": "surat-itms-live-eta",
+              "provider": "UUID",
+              "type": [
+                "iudx:Resource",
+                "iudx:TransitManagement"
+              ],
+              "description": "Realtime bus position information from Surat city public transit buses.",
+              "label": "Surat Transit Realtime Position-UUID",
+              "accessPolicy": "SECURE",
+              "resourceGroup": "UUID",
+              "id": "UUID",
+              "instance": "surat"
+            }
+          }
+        ]
+
+
+    standardInvalidTokenErrorResponseAllQueueAndExcahnge:
+      title: standardInvalidTokenErrorResponse
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        detail:
+          type: string
+      example:
+        type: dx:dataplane:invalidAuthorizationToken
+        title: Not Authorized
+        detail: Not Authorized
+
+    adapterBadRequestErrorResponse:
+      title: adapterBadRequestErrorResponse
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        detail:
+          type: string
+      example:
+        type: dx:dataplane:badRequest
+        title: Bad Request Data
+        detail: Missing/Invalid parameters
+
+    summaryBadRequestErrorResponse:
+      title: adapterBadRequestErrorResponse
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        detail:
+          type: string
+      example:
+        type: dx:dataplane:backend
+        title: bad request
+        detail: bad request
+
+    ForbiddenResponse:
+      type: object
+      properties:
+        type:
+          type: string
+          example: dx:dataplane:no-access
+        title:
+          type: string
+          example: No-access / Forbidden
+        detail:
+          type: string
+          example: Access check failed doc doesn't exist / Access check failed Access denied for restricted item
+
+    payloadTooLarge:
+      title: payloadtoolarge
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        detail:
+          type: string
+      example:
+        type: dx:dataplane:payloadTooLarge
+        title: Payload Too Large
+        detail: Response size exceeds limit use filters to get value within limit or use download api

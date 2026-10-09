@@ -13,15 +13,17 @@ BASE_URL = os.getenv("IUDX_BASE_URL", "https://v2.dev.controlplane.iudx.io")
 RS_BASE_URL = os.getenv("RS_BASE_URL", "https://v2.dev.rs.iudx.io")
 RSP_BASE_URL = os.getenv("RSP_BASE_URL", "https://v2.dev.rs.iudx.io/rsp")
 FILES_BASE_URL = os.getenv("FILES_BASE_URL", "https://v2.dev.file-s3.iudx.io/v1")
+SANDBOX_BASE_URL = os.getenv("SANDBOX_BASE_URL", "https://v2.dev.sandbox.iudx.io")
 ES_INDEX_PREFIX = os.getenv("ES_INDEX_PREFIX", "")
 
 # Persistent per-service HTTP clients — created once at import time,
 # reused across all tool calls for connection pooling (eliminates TCP/TLS overhead).
 _clients: dict[str, httpx.AsyncClient] = {
-    "cat":   httpx.AsyncClient(timeout=30),
-    "rs":    httpx.AsyncClient(timeout=60),
-    "rsp":   httpx.AsyncClient(timeout=60),
-    "files": httpx.AsyncClient(timeout=30),
+    "cat":     httpx.AsyncClient(timeout=30),
+    "rs":      httpx.AsyncClient(timeout=60),
+    "rsp":     httpx.AsyncClient(timeout=60),
+    "files":   httpx.AsyncClient(timeout=30),
+    "sandbox": httpx.AsyncClient(timeout=60),
 }
 logger.info("HTTP clients initialized (persistent connection pooling enabled)")
 
@@ -72,6 +74,11 @@ def _fmt_item(item: dict) -> str:
 # Control Plane HTTP helpers
 # ---------------------------------------------------------------------------
 
+def _json_or_empty(r: httpx.Response) -> Any:
+    """Parse a JSON body; return {} for empty responses (e.g. 204)."""
+    return r.json() if r.content else {}
+
+
 async def _get(
     path: str, *, token: str = "", params: dict[str, Any] | None = None
 ) -> dict:
@@ -79,7 +86,7 @@ async def _get(
     logger.info("GET %s params=%s", url, params)
     r = await _clients["cat"].get(url, params=params, headers=_headers(token))
     r.raise_for_status()
-    return r.json()
+    return _json_or_empty(r)
 
 
 async def _post(
@@ -88,22 +95,28 @@ async def _post(
     token: str = "",
     params: dict[str, Any] | None = None,
     body: dict[str, Any] | None = None,
+    extra_headers: dict[str, str] | None = None,
 ) -> dict:
     url = f"{BASE_URL}{path}"
     logger.info("POST %s params=%s", url, params)
-    r = await _clients["cat"].post(url, params=params, json=body, headers=_headers(token))
+    headers = {**_headers(token), **(extra_headers or {})}
+    r = await _clients["cat"].post(url, params=params, json=body, headers=headers)
     r.raise_for_status()
-    return r.json()
+    return _json_or_empty(r)
 
 
 async def _put(
-    path: str, *, token: str = "", body: dict[str, Any] | None = None
+    path: str,
+    *,
+    token: str = "",
+    params: dict[str, Any] | None = None,
+    body: dict[str, Any] | None = None,
 ) -> dict:
     url = f"{BASE_URL}{path}"
-    logger.info("PUT %s", url)
-    r = await _clients["cat"].put(url, json=body, headers=_headers(token))
+    logger.info("PUT %s params=%s", url, params)
+    r = await _clients["cat"].put(url, params=params, json=body, headers=_headers(token))
     r.raise_for_status()
-    return r.json()
+    return _json_or_empty(r)
 
 
 async def _patch(
@@ -117,17 +130,34 @@ async def _patch(
     logger.info("PATCH %s params=%s", url, params)
     r = await _clients["cat"].patch(url, params=params, json=body, headers=_headers(token))
     r.raise_for_status()
-    return r.json()
+    return _json_or_empty(r)
 
 
 async def _delete(
-    path: str, *, token: str = "", params: dict[str, Any] | None = None
+    path: str,
+    *,
+    token: str = "",
+    params: dict[str, Any] | None = None,
+    body: dict[str, Any] | None = None,
 ) -> dict:
     url = f"{BASE_URL}{path}"
     logger.info("DELETE %s params=%s", url, params)
-    r = await _clients["cat"].delete(url, params=params, headers=_headers(token))
+    r = await _clients["cat"].request(
+        "DELETE", url, params=params, json=body, headers=_headers(token)
+    )
     r.raise_for_status()
-    return r.json()
+    return _json_or_empty(r)
+
+
+async def _get_text(
+    path: str, *, token: str = "", params: dict[str, Any] | None = None
+) -> dict:
+    """GET an endpoint that returns CSV / plain text (reports, scripts)."""
+    url = f"{BASE_URL}{path}"
+    logger.info("GET(text) %s params=%s", url, params)
+    r = await _clients["cat"].get(url, params=params, headers=_headers(token))
+    r.raise_for_status()
+    return {"content_type": r.headers.get("content-type", ""), "text": r.text}
 
 
 # ---------------------------------------------------------------------------
@@ -265,3 +295,54 @@ async def _files_put(
     r = await _clients["files"].put(url, json=body, headers=_headers(token))
     r.raise_for_status()
     return r.json()
+
+
+# ---------------------------------------------------------------------------
+# Sandbox Connect HTTP helpers
+# ---------------------------------------------------------------------------
+
+async def _sandbox_request(
+    method: str,
+    path: str,
+    *,
+    token: str = "",
+    params: dict[str, Any] | None = None,
+    body: dict[str, Any] | None = None,
+) -> dict:
+    url = f"{SANDBOX_BASE_URL}{path}"
+    logger.info("SANDBOX %s %s params=%s", method, url, params)
+    r = await _clients["sandbox"].request(
+        method, url, params=params, json=body, headers=_headers(token)
+    )
+    r.raise_for_status()
+    return _json_or_empty(r)
+
+
+async def _sandbox_get(
+    path: str, *, token: str = "", params: dict[str, Any] | None = None
+) -> dict:
+    return await _sandbox_request("GET", path, token=token, params=params)
+
+
+async def _sandbox_post(
+    path: str, *, token: str = "", body: dict[str, Any] | None = None
+) -> dict:
+    return await _sandbox_request("POST", path, token=token, body=body)
+
+
+async def _sandbox_put(
+    path: str, *, token: str = "", body: dict[str, Any] | None = None
+) -> dict:
+    return await _sandbox_request("PUT", path, token=token, body=body)
+
+
+async def _sandbox_patch(
+    path: str, *, token: str = "", body: dict[str, Any] | None = None
+) -> dict:
+    return await _sandbox_request("PATCH", path, token=token, body=body)
+
+
+async def _sandbox_delete(
+    path: str, *, token: str = "", body: dict[str, Any] | None = None
+) -> dict:
+    return await _sandbox_request("DELETE", path, token=token, body=body)

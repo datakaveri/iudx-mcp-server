@@ -29,6 +29,19 @@ async def files_health() -> dict:
     return r.json()
 
 
+@mcp.tool()
+async def get_files_encryption_public_key() -> dict:
+    """Fetch the Files Connect encryption public key (GET /v1/encryption/public-key).
+
+    No authentication required.
+    """
+    url = f"{FILES_BASE_URL}/encryption/public-key"
+    logger.info("FILES GET %s", url)
+    r = await _clients["files"].get(url, timeout=10)
+    r.raise_for_status()
+    return r.json()
+
+
 # ---------------------------------------------------------------------------
 # Databanks — Files
 # ---------------------------------------------------------------------------

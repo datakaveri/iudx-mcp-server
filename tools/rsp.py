@@ -17,6 +17,7 @@ async def rsp_get_entities_v1(
     geoproperty: str = "",
     q: str = "",
     attrs: str = "",
+    options: str = "",
     limit: int = 0,
     offset: int = 0,
 ) -> dict:
@@ -36,6 +37,7 @@ async def rsp_get_entities_v1(
         geoproperty: Property to apply geo filter on (default: location).
         q:           NGSI-LD query expression, e.g. 'temperature>25;humidity<80'.
         attrs:       Comma-separated list of attribute names to return.
+        options:     NGSI-LD options, e.g. 'keyValues' for simplified output.
         limit:       Max number of results.
         offset:      Result offset for pagination.
     """
@@ -52,6 +54,8 @@ async def rsp_get_entities_v1(
         params["q"] = q
     if attrs:
         params["attrs"] = attrs
+    if options:
+        params["options"] = options
     if limit > 0:
         params["limit"] = limit
     if offset > 0:
@@ -145,6 +149,7 @@ async def rsp_get_temporal_entities_v1(
     geoproperty: str = "",
     q: str = "",
     attrs: str = "",
+    options: str = "",
     limit: int = 0,
     offset: int = 0,
 ) -> dict:
@@ -166,6 +171,7 @@ async def rsp_get_temporal_entities_v1(
         geoproperty: Property to apply geo filter on.
         q:           NGSI-LD attribute query, e.g. 'temperature>25'.
         attrs:       Comma-separated attributes to return.
+        options:     NGSI-LD options, e.g. 'keyValues' for simplified output.
         limit:       Max number of results.
         offset:      Result offset for pagination.
     """
@@ -184,6 +190,8 @@ async def rsp_get_temporal_entities_v1(
         params["q"] = q
     if attrs:
         params["attrs"] = attrs
+    if options:
+        params["options"] = options
     if limit > 0:
         params["limit"] = limit
     if offset > 0:
