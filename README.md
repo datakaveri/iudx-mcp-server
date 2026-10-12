@@ -1492,7 +1492,8 @@ iudx-mcp-server/
     ├── control-plane-2.0.yml        # OpenAPI spec — Control Plane
     ├── data-plane-rs-2.0.yml        # OpenAPI spec — Resource Server
     ├── data-plane-rsp-2.0.yml       # OpenAPI spec — Resource Server Proxy
-    └── data-plane-file-2.0.json     # OpenAPI spec — Files Connect
+    ├── data-plane-file-2.0.json     # OpenAPI spec — Files Connect
+    └── sandbox-2.0.json             # Swagger 2.0 spec — Sandbox Connect
 ```
 
 ### Key design decisions
@@ -1522,8 +1523,8 @@ iudx-mcp-server/
 ## OpenAPI Specifications
 
 The specs under `examples/` are the source of truth for the tools. Every operation in
-`control-plane-2.0.yml`, `data-plane-rs-2.0.yml`, `data-plane-rsp-2.0.yml` and
-`data-plane-file-2.0.json` has a corresponding tool.
+`control-plane-2.0.yml`, `data-plane-rs-2.0.yml`, `data-plane-rsp-2.0.yml`,
+`data-plane-file-2.0.json` and `sandbox-2.0.json` has a corresponding tool.
 
 Notes:
 
