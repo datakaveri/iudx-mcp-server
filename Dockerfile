@@ -4,7 +4,7 @@ WORKDIR /app
 
 # Install dependencies first (layer cache)
 COPY pyproject.toml .
-RUN pip install --no-cache-dir "mcp[cli]>=1.2.0" "httpx>=0.27.0"
+RUN pip install --no-cache-dir "mcp[cli]>=1.2.0,<2" "httpx>=0.27.0"
 
 # Copy application code
 COPY server.py .
@@ -18,6 +18,7 @@ ENV IUDX_BASE_URL=https://mahaagx.maharashtra.gov.in/controlplane/
 ENV RS_BASE_URL=https://mahaagx.maharashtra.gov.in/dataplane/
 ENV RSP_BASE_URL=https://mahaagx.maharashtra.gov.in/dataplane/rsp/
 ENV FILES_BASE_URL=https://mahaagx.maharashtra.gov.in/files-connect-api/v1/
+ENV SANDBOX_BASE_URL=https://mahaagx.maharashtra.gov.in/sandbox-connect-api
 ENV ES_INDEX_PREFIX=""
 
 EXPOSE 8000
