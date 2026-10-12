@@ -14,11 +14,11 @@ COPY tools/ tools/
 ENV MCP_TRANSPORT=sse
 ENV MCP_HOST=0.0.0.0
 ENV MCP_PORT=8000
-ENV IUDX_BASE_URL=https://mahaagx.maharashtra.gov.in/controlplane/
-ENV RS_BASE_URL=https://mahaagx.maharashtra.gov.in/dataplane/
-ENV RSP_BASE_URL=https://mahaagx.maharashtra.gov.in/dataplane/rsp/
-ENV FILES_BASE_URL=https://mahaagx.maharashtra.gov.in/files-connect-api/v1/
-ENV SANDBOX_BASE_URL=https://mahaagx.maharashtra.gov.in/sandbox-connect-api
+ENV IUDX_BASE_URL=https://platform.iudx.io/controlplane
+ENV RS_BASE_URL=https://platform.iudx.io/dataplane
+ENV RSP_BASE_URL=https://platform.iudx.io/dataplane/rsp
+ENV FILES_BASE_URL=https://platform.iudx.io/files-connect-api/v1
+ENV SANDBOX_BASE_URL=https://platform.iudx.io/sandbox-connect-api
 ENV ES_INDEX_PREFIX=""
 
 EXPOSE 8000

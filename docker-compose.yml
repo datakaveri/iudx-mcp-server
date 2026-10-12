@@ -11,11 +11,11 @@ services:
       MCP_TRANSPORT: ${MCP_TRANSPORT:-sse}
       MCP_HOST: "0.0.0.0"
       MCP_PORT: "8000"
-      IUDX_BASE_URL: ${IUDX_BASE_URL:-https://mahaagx.maharashtra.gov.in/controlplane/}
-      RS_BASE_URL: ${RS_BASE_URL:-https://mahaagx.maharashtra.gov.in/dataplane/}
-      RSP_BASE_URL: ${RSP_BASE_URL:-https://mahaagx.maharashtra.gov.in/dataplane/rsp/}
-      FILES_BASE_URL: ${FILES_BASE_URL:-https://mahaagx.maharashtra.gov.in/files-connect-api/v1/}
-      SANDBOX_BASE_URL: ${SANDBOX_BASE_URL:-https://mahaagx.maharashtra.gov.in/sandbox-connect-api}
+      IUDX_BASE_URL: ${IUDX_BASE_URL:-https://platform.iudx.io/controlplane}
+      RS_BASE_URL: ${RS_BASE_URL:-https://platform.iudx.io/dataplane}
+      RSP_BASE_URL: ${RSP_BASE_URL:-https://platform.iudx.io/dataplane/rsp}
+      FILES_BASE_URL: ${FILES_BASE_URL:-https://platform.iudx.io/files-connect-api/v1}
+      SANDBOX_BASE_URL: ${SANDBOX_BASE_URL:-https://platform.iudx.io/sandbox-connect-api}
       ES_INDEX_PREFIX: ${ES_INDEX_PREFIX:-}
     restart: unless-stopped
     healthcheck:
