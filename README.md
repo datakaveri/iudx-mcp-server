@@ -1,6 +1,6 @@
 # IUDX MCP Server
 
-A [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server for the [Intelligent Universal Data Exchange (IUDX)](https://dataforpublicgood.org.in/technology/) platform. It exposes the full IUDX **Control Plane**, **Resource Server**, **Resource Server Proxy**, **Files Connect**, and **Sandbox Connect** APIs as **115 Tools**, **8 Resources** (+ 1 resource template), and **13 Prompts**, enabling AI assistants (Claude Desktop, Claude Code, and any MCP-compatible client) to discover, access, query, ingest, manage files, and run sandbox notebooks in IUDX datasets, AI models, organisations, and subscriptions through natural language.
+A [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server for the [Intelligent Universal Data Exchange (IUDX)](https://dataforpublicgood.org.in/technology/) platform. It exposes the full IUDX **Control Plane**, **Resource Server**, **Resource Server Proxy**, **Files Connect**, and **Sandbox Connect** APIs as **216 Tools**, **8 Resources** (+ 1 resource template), and **13 Prompts**, enabling AI assistants (Claude Desktop, Claude Code, and any MCP-compatible client) to discover, access, query, ingest, manage files, and run sandbox notebooks in IUDX datasets, AI models, organisations, and subscriptions through natural language.
 
 ---
 
@@ -34,6 +34,7 @@ A [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server for the
   - [Subscriptions](#subscriptions)
   - [Asset Access Requests](#asset-access-requests)
   - [Compute Requests](#compute-requests)
+  - [Control Plane — Additional Endpoints](#control-plane--additional-endpoints)
   - [Resource Server — Data Query](#resource-server--data-query)
   - [Resource Server — Data Ingestion](#resource-server--data-ingestion)
   - [Resource Server Proxy — Spatial Query](#resource-server-proxy--spatial-query)
@@ -58,6 +59,7 @@ A [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server for the
   - [SSE transport](#sse-transport)
   - [RS tools](#rs-tools)
 - [Project Structure](#project-structure)
+- [OpenAPI Specifications](#openapi-specifications)
 
 ---
 
@@ -455,9 +457,9 @@ Require `cos_admin` or `org_admin` role.
 | `list_org_users` | `GET /iudx/v2/auth/organisations/{id}/users` | optional auth | List members of an org |
 | `list_org_creation_requests` | `GET /iudx/v2/auth/organisations/requests` | `cos_admin` | List pending org creation requests |
 | `submit_org_creation_request` | `POST /iudx/v2/auth/organisations/requests` | any | Submit an org creation request |
-| `approve_org_creation_request` | `POST /iudx/v2/auth/organisations/requests/approve` | `cos_admin` | Approve or reject an org creation request |
+| `approve_org_creation_request` | `POST /iudx/v2/auth/organisations/requests/approve` | `cos_admin` | Approve or reject (`granted` / `rejected`) an org creation request |
 | `list_org_join_requests` | `GET /iudx/v2/auth/organisations/{id}/join_requests` | `org_admin` | List pending join requests for an org |
-| `handle_org_join_request` | `POST /iudx/v2/auth/organisations/{org_id}/join_requests/{req_id}` | `org_admin` | Approve or reject a join request |
+| `handle_org_join_request` | `PUT /iudx/v2/auth/organisations/{org_id}/join_requests/{req_id}` | `org_admin` | Approve or reject (`granted` / `rejected`) a join request |
 
 ---
 
@@ -466,7 +468,7 @@ Require `cos_admin` or `org_admin` role.
 | Tool | HTTP | Role | Description |
 |---|---|---|---|
 | `get_my_profile` | `GET /iudx/v2/auth/user` | any | Fetch the authenticated user's profile |
-| `update_my_profile` | `PUT /iudx/v2/auth/user/update` | any | Update profile fields |
+| `update_my_profile` | `PUT /iudx/v2/auth/user` | any | Update profile fields |
 | `admin_list_users` | `GET /iudx/v2/auth/admin/user` | `cos_admin` | List all platform users |
 | `admin_get_user` | `GET /iudx/v2/auth/admin/user/{id}` | `cos_admin` | Fetch a user by ID |
 
@@ -488,6 +490,7 @@ Require `cos_admin` or `org_admin` role.
 | Tool | HTTP | Description |
 |---|---|---|
 | `get_token` | `POST /iudx/v2/auth/token` | Obtain or refresh a Bearer JWT. No prior auth needed. |
+| `get_token_with_client_credentials` | `POST /iudx/v2/auth/token` | Issue a JWT from `clientId`/`clientSecret` headers (optionally scoped to an `item_id`). See also `create_client_credentials` and `get_app_token` under [Control Plane — Additional Endpoints](#control-plane--additional-endpoints). |
 
 ---
 
@@ -520,7 +523,7 @@ All public — no authentication required.
 | `list_subscriptions` | `GET /iudx/v2/subscriptions` | List own subscriptions |
 | `create_subscription` | `POST /iudx/v2/subscriptions` | Create a new subscription |
 | `get_subscription` | `GET /iudx/v2/subscriptions/{id}` | Fetch a subscription by ID |
-| `update_subscription` | `PUT /iudx/v2/subscriptions/{id}` | Update a subscription |
+| `update_subscription` | `PATCH /iudx/v2/subscriptions/{id}` | Update a subscription |
 | `delete_subscription` | `DELETE /iudx/v2/subscriptions/{id}` | Delete a subscription |
 
 ---
@@ -1466,14 +1469,30 @@ result = await session.call_tool("rs_download_entity_data", {
 
 ```
 iudx-mcp-server/
-├── server.py            # MCP server — all tools, resources, and prompts
+├── server.py            # Entry point — imports the tool modules and starts the MCP server
+├── tools/
+│   ├── _app.py          # FastMCP instance, base URLs, HTTP clients and request helpers
+│   ├── catalogue.py     # Catalogue search / items / org assets
+│   ├── controlplane.py  # Core control-plane tools (orgs, users, credits, subscriptions, ...)
+│   ├── controlplane_extra.py  # Remaining control-plane-2.0 endpoints (delegation, apps,
+│   │                          # feedback, KYC, sharing, conversations, reports, ...)
+│   ├── rs.py            # Resource Server (query, download, ingestion)
+│   ├── rsp.py           # Resource Server Proxy (NGSI-LD v1/v2)
+│   ├── files.py         # Files Connect
+│   ├── sandbox.py       # Sandbox Connect
+│   ├── resources.py     # MCP resources
+│   └── prompts.py       # MCP prompts
 ├── pyproject.toml       # Project metadata and dependencies
 ├── Dockerfile           # Container image (SSE transport by default)
 ├── docker-compose.yml   # Single-service Compose stack
 ├── .dockerignore        # Files excluded from the Docker build context
 ├── README.md            # This file
 └── examples/
-    └── example_client.py  # Programmatic MCP client (stdio / SSE / HTTP)
+    ├── example_client.py            # Programmatic MCP client (stdio / SSE / HTTP)
+    ├── control-plane-2.0.yml        # OpenAPI spec — Control Plane
+    ├── data-plane-rs-2.0.yml        # OpenAPI spec — Resource Server
+    ├── data-plane-rsp-2.0.yml       # OpenAPI spec — Resource Server Proxy
+    └── data-plane-file-2.0.json     # OpenAPI spec — Files Connect
 ```
 
 ### Key design decisions
@@ -1497,3 +1516,22 @@ iudx-mcp-server/
 | Resource Server Proxy | `https://v2.dev.rs.iudx.io/rsp/apis` |
 | Files Connect | `https://v2.dev.file-s3.iudx.io/apis` |
 | Sandbox Connect | `https://v2.dev.sandbox.iudx.io/apis` |
+
+---
+
+## OpenAPI Specifications
+
+The specs under `examples/` are the source of truth for the tools. Every operation in
+`control-plane-2.0.yml`, `data-plane-rs-2.0.yml`, `data-plane-rsp-2.0.yml` and
+`data-plane-file-2.0.json` has a corresponding tool.
+
+Notes:
+
+- A few tools expose endpoints that are **not in the specs** (e.g. `rs_ingest_*`, `get_usage_summary`).
+- Some spec endpoints may not be enabled on every deployment. Against the MahaAgX deployment,
+  `GET /dashboard/usage-summary`, `/auth/delegation/delegator/report`,
+  `/user/feedback/{approved,platform,user}` and Files `/encryption/public-key` returned 404.
+- `data-plane-rs-2.0.yml` is not strictly valid YAML (an unquoted flow-sequence enum around
+  line 836), so strict parsers will reject it.
+- Endpoints that return CSV or plain text (reports, script downloads) return
+  `{"content_type": ..., "text": ...}`.
