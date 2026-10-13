@@ -4,7 +4,7 @@ WORKDIR /app
 
 # Install dependencies first (layer cache)
 COPY pyproject.toml .
-RUN pip install --no-cache-dir "mcp[cli]>=1.2.0" "httpx>=0.27.0"
+RUN pip install --no-cache-dir "mcp[cli]>=1.2.0,<2" "httpx>=0.27.0"
 
 # Copy application code
 COPY server.py .
